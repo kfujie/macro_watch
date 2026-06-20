@@ -88,7 +88,12 @@ def plot_curve_shifts(panel: pd.DataFrame) -> Figure:
         for label, ts in snapshots.items():
             if pd.isna(ts):
                 continue
-            ax.plot(x, panel.loc[ts, cols].to_numpy(), styles[label], label=f"{label} ({ts.date()})")
+            ax.plot(
+                x,
+                panel.loc[ts, cols].to_numpy(),
+                styles[label],
+                label=f"{label} ({ts.date()})",
+            )
         ax.set_xticks(x, tenors)
         ax.set_title(f"{title} Curve")
         ax.set_xlabel("Tenor")
@@ -117,7 +122,9 @@ def _dual_axis(
     ax.set_ylabel(left_label, color=left_color)
     ax.tick_params(axis="y", labelcolor=left_color)
     twin = ax.twinx()
-    twin.plot(right.index, right.to_numpy(), color=right_color, lw=1.6, label=right_label)
+    twin.plot(
+        right.index, right.to_numpy(), color=right_color, lw=1.6, label=right_label
+    )
     twin.set_ylabel(right_label, color=right_color)
     twin.tick_params(axis="y", labelcolor=right_color)
     twin.grid(False)
@@ -162,7 +169,9 @@ def plot_decoupling(panel: pd.DataFrame, *, lookback: int = 504) -> Figure:
     return fig
 
 
-def plot_rolling_correlations(correlations: pd.DataFrame, *, lookback: int = 504) -> Figure:
+def plot_rolling_correlations(
+    correlations: pd.DataFrame, *, lookback: int = 504
+) -> Figure:
     """Time series of the 30d/60d rolling correlations for macro pairs."""
     data = correlations.tail(lookback)
     fig, ax = plt.subplots(figsize=(12, 4.6))

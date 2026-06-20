@@ -24,9 +24,9 @@ YIELD_COLUMNS: Final[tuple[str, ...]] = RATE_COLUMNS
 # Columns measured as prices (use log returns).
 PRICE_COLUMNS: Final[tuple[str, ...]] = COMMODITY_COLUMNS + EQUITY_COLUMNS
 
-WEEK: Final[int] = 5          # trading sessions per week
-MONTH: Final[int] = 20        # trading sessions per month
-VOL_WINDOW: Final[int] = 90   # rolling volatility lookback (sessions)
+WEEK: Final[int] = 5  # trading sessions per week
+MONTH: Final[int] = 20  # trading sessions per month
+VOL_WINDOW: Final[int] = 90  # rolling volatility lookback (sessions)
 ANNUALIZER: Final[float] = float(np.sqrt(252))
 
 # Key macro pairs for rolling-correlation diagnostics.
@@ -103,9 +103,7 @@ def horizon_change(panel: pd.DataFrame, horizon: int) -> pd.DataFrame:
     return out
 
 
-def momentum_zscores(
-    panel: pd.DataFrame, *, window: int = VOL_WINDOW
-) -> pd.DataFrame:
+def momentum_zscores(panel: pd.DataFrame, *, window: int = VOL_WINDOW) -> pd.DataFrame:
     """Z-scores of 1-week and 4-week moves vs rolling daily volatility.
 
     A horizon-``h`` move is normalized by the volatility expected over ``h``
@@ -116,9 +114,9 @@ def momentum_zscores(
     for horizon, label in ((WEEK, "1W"), (MONTH, "4W")):
         change = horizon_change(panel, horizon)
         scale = daily_vol * np.sqrt(horizon)
-        out[[f"{c}_z{label}" for c in change.columns]] = (
-            change.div(scale.replace(0.0, np.nan)).to_numpy()
-        )
+        out[[f"{c}_z{label}" for c in change.columns]] = change.div(
+            scale.replace(0.0, np.nan)
+        ).to_numpy()
     return out
 
 
@@ -138,9 +136,9 @@ def rolling_correlations(
         if a not in inc or b not in inc:
             continue
         for win in windows:
-            out[f"{name}_{win}d"] = inc[a].rolling(
-                win, min_periods=max(5, win // 2)
-            ).corr(inc[b])
+            out[f"{name}_{win}d"] = (
+                inc[a].rolling(win, min_periods=max(5, win // 2)).corr(inc[b])
+            )
     return out
 
 
@@ -152,10 +150,10 @@ class WeeklySummary:
     """Container for the current-week snapshot artifacts."""
 
     as_of: pd.Timestamp
-    table: pd.DataFrame          # level / WoW / z-score per asset
-    ohlc: pd.DataFrame           # O/H/L/C for the final week, per asset
-    zscores: pd.DataFrame        # full z-score time series
-    correlations: pd.DataFrame   # rolling correlations time series
+    table: pd.DataFrame  # level / WoW / z-score per asset
+    ohlc: pd.DataFrame  # O/H/L/C for the final week, per asset
+    zscores: pd.DataFrame  # full z-score time series
+    correlations: pd.DataFrame  # rolling correlations time series
 
 
 def _week_window(index: pd.DatetimeIndex, as_of: pd.Timestamp) -> pd.DatetimeIndex:
@@ -189,8 +187,12 @@ def weekly_summary(panel: pd.DataFrame, *, window: int = VOL_WINDOW) -> WeeklySu
     table = pd.DataFrame(index=cols)
     table["Level"] = enriched.loc[as_of, cols]
     table["WoW"] = wow.loc[as_of, cols]
-    table["Z_1W"] = [zscores.get(f"{c}_z1W", pd.Series(dtype=float)).get(as_of, np.nan) for c in cols]
-    table["Z_4W"] = [zscores.get(f"{c}_z4W", pd.Series(dtype=float)).get(as_of, np.nan) for c in cols]
+    table["Z_1W"] = [
+        zscores.get(f"{c}_z1W", pd.Series(dtype=float)).get(as_of, np.nan) for c in cols
+    ]
+    table["Z_4W"] = [
+        zscores.get(f"{c}_z4W", pd.Series(dtype=float)).get(as_of, np.nan) for c in cols
+    ]
     table["Type"] = ["Price" if c in PRICE_COLUMNS else "Yield/Spread" for c in cols]
 
     ohlc = weekly_ohlc(enriched, as_of)
@@ -205,5 +207,7 @@ def weekly_zscore_matrix(panel: pd.DataFrame, *, window: int = VOL_WINDOW) -> pd
     z = momentum_zscores(enriched, window=window)
     as_of = enriched.dropna(how="all").index.max()
     assets = list(panel.columns) + ["US10Y_REAL", "US_10s2s", "JP_10s2s"]
-    data = {a: z.get(f"{a}_z1W", pd.Series(dtype=float)).get(as_of, np.nan) for a in assets}
+    data = {
+        a: z.get(f"{a}_z1W", pd.Series(dtype=float)).get(as_of, np.nan) for a in assets
+    }
     return pd.Series(data, name=str(as_of.date()))

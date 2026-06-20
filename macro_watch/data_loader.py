@@ -33,7 +33,11 @@ JGB_HISTORICAL_CSV_URL: Final[str] = (
 )
 
 # MoF column label (Japanese) -> canonical name.
-JGB_TENOR_MAP: Final[Mapping[str, str]] = {"2年": "JP2Y", "5年": "JP5Y", "10年": "JP10Y"}
+JGB_TENOR_MAP: Final[Mapping[str, str]] = {
+    "2年": "JP2Y",
+    "5年": "JP5Y",
+    "10年": "JP10Y",
+}
 
 # FRED keyless CSV endpoint (no API key required).
 FRED_CSV_URL: Final[str] = "https://fred.stlouisfed.org/graph/fredgraph.csv"
@@ -110,7 +114,9 @@ def _get_with_retry(
             return resp
         except requests.RequestException as exc:
             last = exc
-            logger.warning("GET %s failed (attempt %d/%d): %s", url, attempt, retries, exc)
+            logger.warning(
+                "GET %s failed (attempt %d/%d): %s", url, attempt, retries, exc
+            )
     raise DataSourceError(f"GET {url} failed after {retries} attempts: {last}")
 
 
@@ -123,9 +129,7 @@ def _strip_tz(idx: pd.DatetimeIndex) -> pd.DatetimeIndex:
 
 def _parse_jgb_dates(raw: pd.Series) -> pd.DatetimeIndex:
     """Vectorized parse of MoF Japanese-era dates ('R8.6.1', 'S49.9.24')."""
-    parts = raw.astype(str).str.extract(
-        r"^\s*([MTSHR])(\d+)\.(\d{1,2})\.(\d{1,2})\s*$"
-    )
+    parts = raw.astype(str).str.extract(r"^\s*([MTSHR])(\d+)\.(\d{1,2})\.(\d{1,2})\s*$")
     parts.columns = ["era", "yy", "mm", "dd"]
     offset = parts["era"].map(_ERA_OFFSET)
     if offset.isna().any():
@@ -133,7 +137,11 @@ def _parse_jgb_dates(raw: pd.Series) -> pd.DatetimeIndex:
         raise DataSourceError(f"Unrecognized JGB era token(s): {bad}")
     year = offset.astype("int64") + parts["yy"].astype("int64")
     frame = pd.DataFrame(
-        {"year": year, "month": parts["mm"].astype("int64"), "day": parts["dd"].astype("int64")}
+        {
+            "year": year,
+            "month": parts["mm"].astype("int64"),
+            "day": parts["dd"].astype("int64"),
+        }
     )
     return pd.DatetimeIndex(pd.to_datetime(frame))
 
@@ -197,7 +205,12 @@ def load_jgb(
 
     out = pd.concat(frames).sort_index()
     out = out[~out.index.duplicated(keep="last")]
-    logger.info("JGB: %d rows (%s -> %s)", len(out), out.index.min().date(), out.index.max().date())
+    logger.info(
+        "JGB: %d rows (%s -> %s)",
+        len(out),
+        out.index.min().date(),
+        out.index.max().date(),
+    )
     return out
 
 
@@ -227,7 +240,9 @@ def load_fred(
         raise DataSourceError(f"FRED CSV parse error: {exc}") from exc
 
     date_col = raw.columns[0]  # 'observation_date' (or legacy 'DATE')
-    raw = raw.set_index(pd.to_datetime(raw[date_col], errors="coerce")).drop(columns=date_col)
+    raw = raw.set_index(pd.to_datetime(raw[date_col], errors="coerce")).drop(
+        columns=date_col
+    )
     raw.index = _strip_tz(pd.DatetimeIndex(raw.index))
 
     # FRED silently omits de-listed ids; rename what came back and warn on gaps.
