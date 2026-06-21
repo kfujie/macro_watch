@@ -354,7 +354,7 @@ class MacroDataLoader:
     cache_dir: Path = field(default_factory=lambda: Path("data_cache"))
     start: date = date(2015, 1, 1)
     end: date | None = None
-    jgb_url: str = JGB_HISTORICAL_CSV_URL
+    jgb_urls: tuple[str, ...] = (JGB_HISTORICAL_CSV_URL, JGB_CSV_URL)
     compression: str = "snappy"
 
     def __post_init__(self) -> None:
@@ -374,7 +374,7 @@ class MacroDataLoader:
         """Pull every source (degrading gracefully) and align the panel."""
         frames: list[pd.DataFrame] = []
         for name, loader in (
-            ("JGB", lambda: load_jgb(self.jgb_url)),
+            ("JGB", lambda: load_jgb(self.jgb_urls)),
             ("FRED", lambda: load_fred(self.start, self._resolved_end)),
             ("Yahoo", lambda: load_yahoo(self.start, self._resolved_end)),
         ):

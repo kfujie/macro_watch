@@ -223,13 +223,24 @@ def _rates_correlations(panel: pd.DataFrame) -> dict[str, Any]:
     return _corr_block(pairs, analytics.rates_structure_levels(panel), analytics.MONTH)
 
 
+def _has_data(panel: pd.DataFrame, market: str) -> bool:
+    """True if any of a market's curve tenors has a value (else it's been skipped)."""
+    cols = [c for c in CURVES[market].values() if c in panel]
+    return bool(cols) and bool(panel[cols].notna().any().any())
+
+
 def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, Any]:
-    """Assemble the full front-end payload from the canonical panel."""
+    """Assemble the front-end payload from the canonical panel.
+
+    A market whose curve is entirely NaN (e.g. JGB when MoF is unreachable) is
+    omitted rather than crashing the export; the front-end renders whatever
+    markets are present.
+    """
     as_of = panel.dropna(how="all").index.max()
     zmatrix = analytics.weekly_zscore_matrix(panel)
     return {
         "as_of": as_of.date().isoformat(),
-        "markets": {m: _market(panel, m) for m in CURVES},
+        "markets": {m: _market(panel, m) for m in CURVES if _has_data(panel, m)},
         "fx": _fx(panel),
         "equities": _clean(sectors.build_equities(panel, refresh=refresh)),
         "rates_correlations": _rates_correlations(panel),

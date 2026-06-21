@@ -5,7 +5,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from macro_watch.data_loader import DataSourceError, _parse_jgb_dates
+from macro_watch.data_loader import (
+    DataSourceError,
+    MacroDataLoader,
+    _parse_jgb_dates,
+)
 
 
 def _parse_one(token: str) -> pd.Timestamp:
@@ -48,3 +52,11 @@ def test_vectorized_parse_preserves_order():
 def test_unknown_era_token_raises():
     with pytest.raises(DataSourceError, match="era token"):
         _parse_jgb_dates(pd.Series(["X3.1.1"]))
+
+
+def test_loader_holds_jgb_urls_as_tuple(tmp_path):
+    # Regression: a bare string would be iterated character-by-character by
+    # load_jgb's `for url in urls`, turning each char into a bogus GET.
+    loader = MacroDataLoader(cache_dir=tmp_path)
+    assert isinstance(loader.jgb_urls, tuple)
+    assert loader.jgb_urls and all(u.startswith("http") for u in loader.jgb_urls)
