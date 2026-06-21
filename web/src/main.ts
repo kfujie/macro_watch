@@ -1,5 +1,5 @@
 import "./styles.css";
-import type { Horizon, IndexAttribution, MacroData, Market } from "./types";
+import type { Horizon, IndexAttribution, MacroData, Market, SeriesPoint } from "./types";
 import { applyTimeTheme } from "./theme";
 import { card, el, openLightbox, table } from "./ui";
 import {
@@ -38,11 +38,26 @@ function figure(nodes: Chart[], rebuild?: () => Chart[]): HTMLElement {
   return fig;
 }
 
+/** "all" = full lookback; "1m" = trailing ~1 month, stats & y-axis rescaled to it. */
+type Window = "all" | "1m";
+
+/** Slice a date-stamped series to the trailing calendar month (inclusive). */
+function lastMonth(points: SeriesPoint[]): SeriesPoint[] {
+  if (points.length === 0) return points;
+  const cutoff = new Date(points[points.length - 1]!.date);
+  cutoff.setMonth(cutoff.getMonth() - 1);
+  return points.filter((p) => new Date(p.date) >= cutoff);
+}
+
 function structureCard(
-  serie: { name: string; points: Market["butterflies"]["series"][number]["points"] },
+  serie: { name: string; points: SeriesPoint[] },
+  window: Window,
   color?: string,
 ): HTMLElement {
-  const stats = bflyStats(serie.points);
+  // Mean / ±σ bands and the y-axis are derived from the windowed slice, so the
+  // panel auto-rescales when the user narrows to the past month.
+  const points = window === "1m" ? lastMonth(serie.points) : serie.points;
+  const stats = bflyStats(points);
   const titleBits: (Node | string)[] = [el("b", {}, [serie.name])];
   if (stats) {
     titleBits.push(
@@ -53,12 +68,44 @@ function structureCard(
     );
   }
   const body = stats
-    ? figure([butterflyPanel(serie.points, stats, color)])
+    ? figure([butterflyPanel(points, stats, color)])
     : el("p", { class: "note" }, ["No data."]);
   return el("div", { class: "card" }, [
     el("div", { class: "card-title" }, titleBits),
     body,
   ]);
+}
+
+/** A grid of structure panels with a shared Full-history / Past-month toggle. */
+function structureGroup(
+  series: { name: string; points: SeriesPoint[] }[],
+  color?: string,
+): HTMLElement {
+  let window: Window = "all";
+  const grid = el("div", { class: "grid-2" }, []);
+  const paint = (): void => {
+    grid.replaceChildren(...series.map((s) => structureCard(s, window, color)));
+  };
+
+  const buttons: HTMLElement[] = [];
+  const mkBtn = (label: string, w: Window): HTMLElement => {
+    const b = el("button", { class: "toggle" + (w === window ? " on" : "") }, [label]);
+    b.addEventListener("click", () => {
+      window = w;
+      buttons.forEach((x) => x.classList.remove("on"));
+      b.classList.add("on");
+      paint();
+    });
+    buttons.push(b);
+    return b;
+  };
+
+  const toggles = el("div", { class: "toggles" }, [
+    mkBtn("Full history", "all"),
+    mkBtn("Past month", "1m"),
+  ]);
+  paint();
+  return el("div", {}, [toggles, grid]);
 }
 
 function marketSection(name: string, m: Market): HTMLElement {
@@ -80,23 +127,17 @@ function marketSection(name: string, m: Market): HTMLElement {
 
     el("h3", { class: "sub" }, [`Slopes — spread (bp), steeper = up`]),
     el("p", { class: "note" }, [
-      `Curve slope (yield_B − yield_A) over ~${years}y, with mean and ±1σ/±2σ bands.`,
+      `Curve slope (yield_B − yield_A) with mean and ±1σ/±2σ bands. ` +
+        `Toggle full history (~${years}y) or the past month — stats and the bp axis rescale.`,
     ]),
-    el(
-      "div",
-      { class: "grid-2" },
-      m.slopes.series.map((s) => structureCard(s, SLOPE_COLOR)),
-    ),
+    structureGroup(m.slopes.series, SLOPE_COLOR),
 
     el("h3", { class: "sub" }, [`Butterflies — spread (bp), belly cheap = up`]),
     el("p", { class: "note" }, [
-      `Tenor-weighted fly spread over ~${years}y, with mean and ±1σ/±2σ bands.`,
+      `Tenor-weighted fly spread with mean and ±1σ/±2σ bands. ` +
+        `Toggle full history (~${years}y) or the past month — stats and the bp axis rescale.`,
     ]),
-    el(
-      "div",
-      { class: "grid-2" },
-      m.butterflies.series.map((s) => structureCard(s)),
-    ),
+    structureGroup(m.butterflies.series),
 
     el("h3", { class: "sub" }, ["Curve PCA — level / slope / curvature"]),
     el("div", { class: "stat-row" }, [
