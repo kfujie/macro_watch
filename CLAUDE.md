@@ -11,6 +11,8 @@ it — the front-end does **no** computation. Keep the two in sync: a new analyt
 ## Environment & commands
 - **uv-managed**, Python 3.13. Run everything via `uv run` (e.g. `uv run python -c ...`).
 - Smoke test: `uv run python -c "from macro_watch.data_loader import MacroDataLoader; MacroDataLoader().load()"`
+- Tests: `uv run pytest` (offline; covers JGB era-date parsing, slope/butterfly sign
+  conventions, PCA sign-normalization, FX fair-value regression). No network needed.
 - **Web (primary)**: `uv run python -m macro_watch.web_export [--refresh]` writes `web/public/data.json`;
   then `cd web && npm install && npm run dev` (http://localhost:5173). Static snapshot — re-run the
   export and reload when the data changes. `npm run build` runs `tsc --noEmit` (type-check only;
