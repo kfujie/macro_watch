@@ -40,6 +40,7 @@ export interface Market {
   curve: Curve;
   tenor_table: Row[];
   rates_table: Row[];
+  slopes: Butterflies;
   butterflies: Butterflies;
   pca: Pca;
 }

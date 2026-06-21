@@ -10,6 +10,9 @@ import type {
 } from "./types";
 
 const PURPLE = "#a78bfa";
+const TEAL = "#52b6a8";
+/** Accent for slope band panels (butterflies keep the default purple). */
+export const SLOPE_COLOR = TEAL;
 const OIL = "#e0903a";
 const BEIC = "#52b6a8";
 
@@ -199,10 +202,11 @@ export function bflyStats(points: SeriesPoint[]): BflyStats | null {
   return { mu, sd, last, z: sd ? (last - mu) / sd : 0, n: v.length };
 }
 
-/** One butterfly panel: spread (bp) line with mean + ±1σ/±2σ bands. */
+/** One structure panel: spread (bp) line with mean + ±1σ/±2σ bands. */
 export function butterflyPanel(
   points: SeriesPoint[],
   stats: BflyStats,
+  color: string = PURPLE,
 ): HTMLElement | SVGSVGElement {
   const line = points
     .filter((p) => p.value !== null)
@@ -216,7 +220,7 @@ export function butterflyPanel(
       x2,
       y1: mu - k * sd,
       y2: mu + k * sd,
-      fill: PURPLE,
+      fill: color,
       fillOpacity: opacity,
     });
 
@@ -231,7 +235,7 @@ export function butterflyPanel(
       band(2, 0.1),
       band(1, 0.18),
       Plot.ruleY([mu], { stroke: ink(), strokeDasharray: "3 3", strokeOpacity: 0.6 }),
-      Plot.line(line, { x: "date", y: "value", stroke: PURPLE, strokeWidth: 1.4 }),
+      Plot.line(line, { x: "date", y: "value", stroke: color, strokeWidth: 1.4 }),
     ],
   });
 }

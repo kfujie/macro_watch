@@ -11,6 +11,7 @@ import {
   pcaCharts,
   priceTransition,
   sectorContribution,
+  SLOPE_COLOR,
   usdjpyVsDifferential,
   zscoreBars,
 } from "./charts";
@@ -24,7 +25,10 @@ function figure(nodes: (HTMLElement | SVGSVGElement)[]): HTMLElement {
   return el("figure", {}, nodes);
 }
 
-function butterflyCard(serie: { name: string; points: Market["butterflies"]["series"][number]["points"] }): HTMLElement {
+function structureCard(
+  serie: { name: string; points: Market["butterflies"]["series"][number]["points"] },
+  color?: string,
+): HTMLElement {
   const stats = bflyStats(serie.points);
   const titleBits: (Node | string)[] = [el("b", {}, [serie.name])];
   if (stats) {
@@ -36,7 +40,7 @@ function butterflyCard(serie: { name: string; points: Market["butterflies"]["ser
     );
   }
   const body = stats
-    ? figure([butterflyPanel(serie.points, stats)])
+    ? figure([butterflyPanel(serie.points, stats, color)])
     : el("p", { class: "note" }, ["No data."]);
   return el("div", { class: "card" }, [
     el("div", { class: "card-title" }, titleBits),
@@ -61,6 +65,16 @@ function marketSection(name: string, m: Market): HTMLElement {
       card("Slopes & butterflies (bp)", table(m.rates_table)),
     ]),
 
+    el("h3", { class: "sub" }, [`Slopes — spread (bp), steeper = up`]),
+    el("p", { class: "note" }, [
+      `Curve slope (yield_B − yield_A) over ~${years}y, with mean and ±1σ/±2σ bands.`,
+    ]),
+    el(
+      "div",
+      { class: "grid-2" },
+      m.slopes.series.map((s) => structureCard(s, SLOPE_COLOR)),
+    ),
+
     el("h3", { class: "sub" }, [`Butterflies — spread (bp), belly cheap = up`]),
     el("p", { class: "note" }, [
       `Tenor-weighted fly spread over ~${years}y, with mean and ±1σ/±2σ bands.`,
@@ -68,7 +82,7 @@ function marketSection(name: string, m: Market): HTMLElement {
     el(
       "div",
       { class: "grid-2" },
-      m.butterflies.series.map(butterflyCard),
+      m.butterflies.series.map((s) => structureCard(s)),
     ),
 
     el("h3", { class: "sub" }, ["Curve PCA — level / slope / curvature"]),

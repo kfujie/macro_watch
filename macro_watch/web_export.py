@@ -109,22 +109,30 @@ def _pca(panel: pd.DataFrame, market: str) -> dict[str, Any]:
     }
 
 
-def _butterflies(panel: pd.DataFrame, market: str) -> dict[str, Any]:
-    """Each fly's tenor-weighted spread (bp) over the lookback, for the band panels.
+def _curve_structures(panel: pd.DataFrame, market: str, n_s: int) -> dict[str, Any]:
+    """Curve structures (slopes ``n_s==2`` or flies ``n_s==3``) as bp band series.
 
     Mean / ±σ bands and the latest z are computed client-side over exactly these
-    points, matching ``visualizer.plot_butterflies`` (belly cheap = positive).
+    points, matching ``visualizer`` (slope steeper = positive, belly cheap = +).
     """
     metrics = analytics.curve_metrics(panel, market).tail(SERIES_TAIL)
-    flies = [c for c in metrics.columns if str(c).count("s") == 3]
+    cols = [c for c in metrics.columns if str(c).count("s") == n_s]
     series = [
         {
             "name": c.replace(f"{market}_", ""),
             "points": _series(metrics[c]),
         }
-        for c in flies
+        for c in cols
     ]
     return {"lookback": SERIES_TAIL, "series": series}
+
+
+def _slopes(panel: pd.DataFrame, market: str) -> dict[str, Any]:
+    return _curve_structures(panel, market, 2)
+
+
+def _butterflies(panel: pd.DataFrame, market: str) -> dict[str, Any]:
+    return _curve_structures(panel, market, 3)
 
 
 def _market(panel: pd.DataFrame, market: str) -> dict[str, Any]:
@@ -136,6 +144,7 @@ def _market(panel: pd.DataFrame, market: str) -> dict[str, Any]:
         "rates_table": _records(
             analytics.rates_snapshot(panel, market), index_name="metric"
         ),
+        "slopes": _slopes(panel, market),
         "butterflies": _butterflies(panel, market),
         "pca": _pca(panel, market),
     }
