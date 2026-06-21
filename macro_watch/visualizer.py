@@ -483,13 +483,29 @@ def plot_fx_fairvalue(
     diff = rate_differential(panel, tenor).reindex(fv.fitted.index)
 
     fig, (ax, axr) = plt.subplots(1, 2, figsize=(13, 5), width_ratios=[1.1, 1.4])
-    ax.scatter(diff.to_numpy(), panel[pair].reindex(diff.index).to_numpy(),
-               s=10, alpha=0.35, color="#6b6b6b")
+    ax.scatter(
+        diff.to_numpy(),
+        panel[pair].reindex(diff.index).to_numpy(),
+        s=10,
+        alpha=0.35,
+        color="#6b6b6b",
+    )
     order = np.argsort(diff.to_numpy())
-    ax.plot(diff.to_numpy()[order], fv.fitted.to_numpy()[order], color="#1f4e79", lw=2.0,
-            label=f"fit: β={fv.beta:.3f}/bp, R²={fv.r2:.2f}")
-    ax.scatter([diff.iloc[-1]], [panel[pair].reindex(diff.index).iloc[-1]],
-               s=90, color="#b8002e", zorder=5, label=f"now ({fv.as_of.date()})")
+    ax.plot(
+        diff.to_numpy()[order],
+        fv.fitted.to_numpy()[order],
+        color="#1f4e79",
+        lw=2.0,
+        label=f"fit: β={fv.beta:.3f}/bp, R²={fv.r2:.2f}",
+    )
+    ax.scatter(
+        [diff.iloc[-1]],
+        [panel[pair].reindex(diff.index).iloc[-1]],
+        s=90,
+        color="#b8002e",
+        zorder=5,
+        label=f"now ({fv.as_of.date()})",
+    )
     ax.set_xlabel(f"{fv.driver} (bp)")
     ax.set_ylabel(pair)
     ax.set_title(f"{pair} vs rate differential")

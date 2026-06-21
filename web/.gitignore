@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.local
+
+# Generated snapshot from macro_watch.web_export (regenerated from sources).
+public/data.json

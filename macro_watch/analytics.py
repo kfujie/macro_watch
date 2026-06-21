@@ -482,8 +482,12 @@ def fx_snapshot(panel: pd.DataFrame, *, window: int = VOL_WINDOW) -> pd.DataFram
     table["Level"] = px.loc[as_of]
     table["WoW%"] = lr.diff(WEEK).loc[as_of] * 100.0
     table["1M%"] = lr.diff(MONTH).loc[as_of] * 100.0
-    table["Z_1W"] = (lr.diff(WEEK) / (vol * np.sqrt(WEEK)).replace(0.0, np.nan)).loc[as_of]
-    table["Z_4W"] = (lr.diff(MONTH) / (vol * np.sqrt(MONTH)).replace(0.0, np.nan)).loc[as_of]
+    table["Z_1W"] = (lr.diff(WEEK) / (vol * np.sqrt(WEEK)).replace(0.0, np.nan)).loc[
+        as_of
+    ]
+    table["Z_4W"] = (lr.diff(MONTH) / (vol * np.sqrt(MONTH)).replace(0.0, np.nan)).loc[
+        as_of
+    ]
     return table.round(3)
 
 
@@ -494,12 +498,12 @@ class FXFairValue:
     pair: str
     driver: str
     as_of: pd.Timestamp
-    beta: float          # FX units per bp of differential
+    beta: float  # FX units per bp of differential
     alpha: float
     r2: float
-    fitted: pd.Series    # model-implied FX level
+    fitted: pd.Series  # model-implied FX level
     residual: pd.Series  # actual - fitted (FX units; + = pair rich vs rates)
-    resid_z: float       # current residual in std units
+    resid_z: float  # current residual in std units
 
 
 def fx_rate_fairvalue(
