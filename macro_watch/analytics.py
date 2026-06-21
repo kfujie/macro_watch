@@ -219,6 +219,23 @@ MACRO_COLUMNS: Final[tuple[str, ...]] = (
     FX_COLUMNS + COMMODITY_COLUMNS + EQUITY_COLUMNS + ("US10Y_REAL",)
 )
 
+# A cross-asset pair is mechanical when its legs share a *building block*, just
+# like curve structures sharing a tenor (_shares_leg). For FX that block is a
+# currency (EURUSD/EURJPY share EUR; USDJPY/DXY share USD); for equities it is a
+# region's constituents (SPX/NDX, N225/TOPIX). Such pairs are dropped from the
+# cross-asset ranking, while genuinely cross-exposure pairs survive — SPX vs N225
+# (different region) and WTI vs GOLD (different sector) are kept.
+_FX_LEGS: Final[Mapping[str, frozenset[str]]] = {
+    "USDJPY": frozenset({"USD", "JPY"}),
+    "EURUSD": frozenset({"EUR", "USD"}),
+    "EURJPY": frozenset({"EUR", "JPY"}),
+    "DXY": frozenset({"USD"}),  # a USD basket; treated as its dollar leg
+}
+_EQUITY_PEERS: Final[tuple[frozenset[str], ...]] = (
+    frozenset({"SPX", "NDX"}),  # US large-cap
+    frozenset({"N225", "TOPIX"}),  # Japan large-cap
+)
+
 
 def _struct_columns(panel: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Curve slope & butterfly time series per market (the rate *structures*)."""
@@ -236,6 +253,14 @@ def _shares_leg(a: str, b: str) -> bool:
     ma, ta = _struct_tenors(a)
     mb, tb = _struct_tenors(b)
     return ma == mb and bool(ta & tb)
+
+
+def _mechanical_macro_pair(a: str, b: str) -> bool:
+    """True if a, b share a building block: a currency leg or an equity peer group."""
+    la, lb = _FX_LEGS.get(a), _FX_LEGS.get(b)
+    if la is not None and lb is not None and la & lb:
+        return True
+    return any({a, b} <= grp for grp in _EQUITY_PEERS)
 
 
 def _rank_pairs(
@@ -276,15 +301,24 @@ def cross_asset_correlations(
     structures (slopes & butterflies). Outright tenors are excluded, and a pair
     must include at least one macro leg — so a structure like ``US_5s10s30s``
     only appears when it co-moves with a non-rate asset (e.g. a yen cross), never
-    paired with another structure. Ranked by absolute correlation.
+    paired with another structure. Pairs sharing a *building block* are also
+    dropped as mechanical: FX crosses sharing a currency (EURUSD/EURJPY) and
+    same-region equities (SPX/NDX). Genuinely cross-exposure pairs survive (SPX
+    vs N225, WTI vs GOLD). Ranked by absolute correlation.
     """
     structs = {c for df in _struct_columns(panel).values() for c in df.columns}
     inc = _daily_increments(cross_asset_levels(panel)).tail(window)
     macro = set(MACRO_COLUMNS)
 
     def keep(a: str, b: str) -> bool:
-        # require >=1 macro leg; the other may be macro or a structure.
-        return (a in macro or b in macro) and not (a in structs and b in structs)
+        # require >=1 macro leg; the other may be macro or a structure. Pairs that
+        # share a building block (currency leg or equity peer) are mechanical, so
+        # drop them like outright tenors / shared-leg structures.
+        return (
+            (a in macro or b in macro)
+            and not (a in structs and b in structs)
+            and not _mechanical_macro_pair(a, b)
+        )
 
     return _rank_pairs(inc, min_obs=min_obs, keep=keep)[:top_n]
 

@@ -2,8 +2,8 @@
 
 The Python layer stays the single source of truth for ingestion and analytics
 (the MoF/FRED/Yahoo quirks and the rates math live in :mod:`macro_watch`); this
-module just serializes the snapshot artifacts the notebook used to render into a
-flat ``data.json`` that the experimental Vite/TS front-end (``web/``) consumes.
+module just serializes the snapshot artifacts into a flat ``data.json`` that the
+Vite/TS front-end (``web/``) consumes.
 
 Run:  ``uv run python -m macro_watch.web_export``  (writes ``web/public/data.json``)
        ``uv run python -m macro_watch.web_export --refresh``  (re-fetch sources)
@@ -178,7 +178,9 @@ def _oil_vs_bei(panel: pd.DataFrame) -> dict[str, Any]:
         "bei": _series(panel["US10Y_BEI"]),
         "wti_level": _clean(wti.iloc[-1]) if len(wti) else None,
         "bei_level": _clean(bei.iloc[-1]) if len(bei) else None,
-        "corr_60d": _clean(corr_series.iloc[-1]) if corr_series is not None and len(corr_series) else None,
+        "corr_60d": _clean(corr_series.iloc[-1])
+        if corr_series is not None and len(corr_series)
+        else None,
     }
 
 
@@ -198,7 +200,11 @@ def _corr_block(
             "corr": _clean(top.corr),
             "n": top.n_obs,
             "series": [
-                {"date": d.date().isoformat(), "a": _clean(z.at[d, top.a]), "b": _clean(z.at[d, top.b])}
+                {
+                    "date": d.date().isoformat(),
+                    "a": _clean(z.at[d, top.a]),
+                    "b": _clean(z.at[d, top.b]),
+                }
                 for d in lv.index
             ],
         }
