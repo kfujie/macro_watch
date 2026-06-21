@@ -25,19 +25,28 @@ computation. Keep the two in sync: a new analytic = a field in `web_export.py` +
 ## Layout
 - `data_loader.py` — ingest (MoF/FRED/Yahoo), business-day align + ffill, Parquet cache.
 - `analytics.py` — curves, real yield, momentum z-scores, rolling corr, **rates: curve_metrics /
-  rates_snapshot / tenor_snapshot / curve_pca / weekly_transition / daily_transition**.
-- `sectors.py` — S&P 500 / Nikkei 225 sector attribution (SPDR + TOPIX-17 ETF proxies), cached to
-  `data_cache/sector_panel.parquet` **separately** from the canonical panel (28 tickers stay out of
-  `CANONICAL_COLUMNS`). Index weights are a documented static approximation.
+  rates_snapshot / tenor_snapshot / curve_pca / weekly_transition / daily_transition**;
+  **correlations: cross_asset_correlations / rates_structure_correlations** (see Conventions).
+- `sectors.py` — S&P 500 / Nikkei 225 sector attribution (SPDR + TOPIX-17 ETF proxies) + index
+  price history, cached to `data_cache/sector_panel.parquet` **separately** from the canonical
+  panel (28 tickers stay out of `CANONICAL_COLUMNS`). Index weights are a documented static approx.
 - `visualizer.py` — matplotlib plots for the notebook (`plot_curve_snapshot`, `plot_curve_pca`,
   `plot_spreads`, `plot_butterflies`, `plot_spread_transition`, `plot_spread_daily`, …).
 - `web_export.py` — serialize panel + analytics + sectors to `web/public/data.json` (NaN→null,
-  dates→ISO; series tail-trimmed to `SERIES_TAIL=504`).
-- `web/` — **primary display**. `src/charts.ts` (Observable Plot: curve, butterflies, PCA, FX
-  fair value, sector contribution, z-scores), `src/ui.ts`, `src/main.ts`, `src/types.ts`.
+  dates→ISO; series tail-trimmed to `SERIES_TAIL=504`). One `_section` builder per web block.
+- `web/` — **primary display**. `src/charts.ts` (Observable Plot), `src/theme.ts` (time-of-day
+  theme), `src/ui.ts`, `src/main.ts`, `src/types.ts` (kept in lockstep with `web_export.py`).
   `public/data.json` is git-ignored (regenerated from sources).
 - `weekly_report.ipynb` (legacy) — §1 ingest, **§2 US Treasury & JGB (main)**, §3 cross-asset
   backdrop, §4 markdown brief (leads with rates). `REFRESH=False` uses the cache.
+
+## Web sections (`web/`, driven by `data.json`)
+Rates per market (curve snapshot + WoW bars, outright/slope-fly tables, **butterfly** band panels,
+PCA) → **rates slope/fly correlation** → **FX** (USD/JPY vs US−JP differential) → **equities**
+(S&P 500 / Nikkei 225 price transition + **sector attribution**, WoW/1M toggle) → **cross-asset**
+(oil vs breakeven, **strongest cross-asset correlation**, 1W z-score row). The page themes itself
+by local time (`theme.ts`): white at noon, dark at midnight; charts read `--ink/--grid/--muted` CSS
+vars at render time, so re-rendering recolors them.
 
 ## Data-source quirks (these took digging — don't relitigate)
 - **MoF JGB**: Shift-JIS CSV, **Japanese-era dates** (`R8.6.1` = Reiwa→2026; offsets in `_ERA_OFFSET`).
@@ -73,6 +82,16 @@ computation. Keep the two in sync: a new analytic = a field in `web_export.py` +
   under `sharex=True` misaligned the ticks.)
 - PCA loadings are **sign-normalized** so PC1≈level, PC2≈slope, PC3≈curvature; rich/cheap residual
   is actual − 3-factor fit (+ = cheap).
+- **Correlations** are Pearson on **daily increments** over the last month (`MONTH=20`), ranked by
+  **|ρ|** (so strong negatives surface). Two deliberately-separated universes:
+  - `cross_asset_correlations`: `MACRO_COLUMNS` (FX + commodities + equities + `US10Y_REAL`) plus
+    curve **structures** (slopes/flies). **Outright tenors are excluded everywhere** (tenor-vs-tenor
+    is mechanical), and a pair needs **≥1 macro leg** — so a structure (e.g. `US_5s10s30s`) only
+    appears when it co-moves with a non-rate asset, never with another structure. `US10Y_REAL` is
+    treated as macro (a cross-asset driver), not a rate — by design.
+  - `rates_structure_correlations`: slopes/flies only (US+JP), **dropping pairs that share a tenor
+    leg** (`_shares_leg`; 2s10s vs 5s10s share the 10Y → mechanical), surfacing cross-structure /
+    cross-market relationships. A user explicitly did **not** want outright-tenor co-movement shown.
 
 ## Cache / schema
 - `CANONICAL_COLUMNS` in `data_loader.py` is the fixed schema; the Parquet cache
