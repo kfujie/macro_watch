@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from macro_watch import analytics, data_loader, visualizer
+from macro_watch import analytics, data_loader
 
-__all__ = ["data_loader", "analytics", "visualizer"]
+__all__ = ["data_loader", "analytics"]
 __version__ = "0.1.0"

@@ -113,7 +113,7 @@ def _curve_structures(panel: pd.DataFrame, market: str, n_s: int) -> dict[str, A
     """Curve structures (slopes ``n_s==2`` or flies ``n_s==3``) as bp band series.
 
     Mean / ±σ bands and the latest z are computed client-side over exactly these
-    points, matching ``visualizer`` (slope steeper = positive, belly cheap = +).
+    points (slope steeper = positive, belly cheap = positive).
     """
     metrics = analytics.curve_metrics(panel, market).tail(SERIES_TAIL)
     cols = [c for c in metrics.columns if str(c).count("s") == n_s]

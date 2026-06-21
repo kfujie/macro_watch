@@ -16,7 +16,6 @@ macro_watch/
 ├── data_loader.py      # MoF (JGB), FRED, Yahoo ingestion + Parquet caching
 ├── analytics.py        # curves, real rates, rolling correlations, z-scores
 ├── sectors.py          # S&P 500 / Nikkei 225 sector attribution (ETF proxies)
-├── visualizer.py       # matplotlib plot helpers (standalone)
 └── web_export.py       # dump the panel + analytics to web/public/data.json
 
 web/                    # experimental Vite + TypeScript + Observable Plot dashboard
@@ -63,8 +62,6 @@ computation — `web_export.py` writes one `data.json` that the TypeScript app r
   (`Z_1W`), level richness z-score (`Z_level`), and trailing-year percentile.
 - **Curve PCA** — level/slope/curvature decomposition (sign-normalized PC1/PC2/PC3) with
   3-factor **rich/cheap** residuals per tenor (+ cheap / − rich).
-- **Weekly transition** (`weekly_transition`) — week-ending (W-FRI) levels across the last N
-  weeks for tenors / slopes / flies, with the latest `WoW(bp)`.
 
 **FX — dollar & yen** — `analytics.fx_snapshot / rate_differential / fx_rate_fairvalue`
 - **FX momentum** — USD/JPY, DXY (primary), EUR/USD, EUR/JPY with WoW/1M % and z-scores.
@@ -83,23 +80,7 @@ computation — `web_export.py` writes one `data.json` that the TypeScript app r
 - Sector ETF prices are cached **separately** (`data_cache/sector_panel.parquet`) and never enter
   the canonical panel's `CANONICAL_COLUMNS`.
 
-## Visualizations
-
-1. **Weekly cross-asset z-score heatmap** — magnitude of the week's moves across all blocks.
-2. **Macro decoupling tracker** — dual-axis real-rates/gold and WTI/breakevens.
-3. **Rolling correlations** — 30d/60d time series for the key macro pairs.
-4. **Curve snapshot & weekly shift** — full UST / JGB curve (current vs 1W / 1M) + per-tenor WoW bars.
-5. **Curve momentum/richness heatmap** — slope & fly `Z_1W` and `Z_level` for both markets.
-6. **Slopes & butterflies** — *actual spread* (bp) time series with mean and ±1σ/±2σ bands.
-7. **Curve PCA** — loadings, factor history, and rich/cheap residual bars.
-8. **Weekly curve transition** — full curve overlaid at the last N weekly closes (oldest→newest)
-   plus the week-on-week change by tenor.
-9. **Butterfly weekly transition** — each fly's level (bp) across the last N weekly closes with
-   the latest week-on-week change.
-10. **Butterfly daily — last week** — the daily path of each fly over the last 5 sessions
-    (`daily_transition` / `plot_spread_daily`), last week shaded, with the WoW move per fly.
-11. **FX — dollar & yen** — USD/JPY & DXY overview, USD/JPY vs the US−JP differential (dual-axis),
-    and the rate-differential fair-value scatter + residual.
+These analytics are rendered by the browser dashboard — see [Web view](#web-view).
 
 ## Setup
 
@@ -138,12 +119,11 @@ the front-end layout.
 
 ```python
 from macro_watch.data_loader import MacroDataLoader
-from macro_watch import analytics, visualizer
+from macro_watch import analytics
 
-panel = MacroDataLoader().load(refresh=True)   # fetch + cache (Parquet)
-summary = analytics.weekly_summary(panel)      # levels / WoW / z-scores
-visualizer.apply_style()
-visualizer.plot_weekly_heatmap(panel)
+panel = MacroDataLoader().load(refresh=True)        # fetch + cache (Parquet)
+rates = analytics.rates_snapshot(panel, "US")       # slopes & flies: WoW/1M, z-scores
+corr = analytics.cross_asset_correlations(panel)    # strongest cross-asset pairs
 ```
 
 The loader degrades gracefully: any single source that fails is skipped (with a warning) and its

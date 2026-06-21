@@ -1,9 +1,9 @@
-# macro_watch — web view (experimental)
+# macro_watch — web view
 
-A browser-based replacement for `weekly_report.ipynb`. Python stays the source of
-truth for ingestion + analytics; it exports one `public/data.json`, and this
-Vite + TypeScript + [Observable Plot](https://observablehq.com/plot/) app renders
-the rates / FX / cross-asset brief from it.
+The dashboard. Python stays the source of truth for ingestion + analytics; it
+exports one `public/data.json`, and this Vite + TypeScript +
+[Observable Plot](https://observablehq.com/plot/) app renders the rates / FX /
+cross-asset brief from it.
 
 ## Pipeline
 
@@ -43,9 +43,9 @@ macro_watch (Python)            web/ (TypeScript)
 
 ## Sections
 
-- **Rates** (§2): US & JGB curve snapshot, slopes/flies tables, **butterfly** spread panels
-  (tenor-weighted bp with mean and ±1σ/±2σ bands, belly cheap = up), and curve PCA.
-- **FX** (§3): USD/JPY vs the US–JP 10Y differential.
+- **Rates**: US & JGB curve snapshot, slopes/flies tables, **slope** and **butterfly** spread
+  panels (bp with mean and ±1σ/±2σ bands; steeper = up, belly cheap = up), and curve PCA.
+- **FX**: USD/JPY vs the US–JP 10Y differential.
 - **Equities**: S&P 500 & Nikkei 225 — each index move decomposed into sector
   contributions (`weight × sector return`), with a WoW/1M toggle. Sector proxies
   are the SPDR Select Sector ETFs (US) and NEXT FUNDS TOPIX-17 ETFs (Japan); see
@@ -56,10 +56,10 @@ macro_watch (Python)            web/ (TypeScript)
 Sector ETF prices are cached separately (`data_cache/sector_panel.parquet`) and
 never touch the canonical panel's `CANONICAL_COLUMNS`.
 
-## Scope (experimental)
+## Extending
 
-The notebook's spread-transition and decoupling panels are not ported yet — add
-fields to `web_export.py` and a chart in `charts.ts` to extend.
+A new analytic = a field in `web_export.py` + a type in `src/types.ts` + a chart
+or table in `src/`. The front-end does no computation.
 
 ## Note on the build
 

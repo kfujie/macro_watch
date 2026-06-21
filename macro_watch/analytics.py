@@ -524,75 +524,6 @@ def curve_pca(
 
 
 # --------------------------------------------------------------------------- #
-# Weekly transition (week-ending levels across the last N weeks)
-# --------------------------------------------------------------------------- #
-def weekly_curve(panel: pd.DataFrame, market: str) -> pd.DataFrame:
-    """Curve metrics sampled at the weekly close (W-FRI): tenors %, slopes/flies bp."""
-    return curve_metrics(panel, market).resample("W-FRI").last()
-
-
-def weekly_transition(
-    panel: pd.DataFrame, market: str, *, weeks: int = 8, kind: str = "all"
-) -> pd.DataFrame:
-    """Week-ending levels across the last ``weeks`` weeks (a transition table).
-
-    Rows are tenors (``%``), slopes and butterflies (``bp``); columns are the last
-    ``weeks`` Friday closes plus the latest week-over-week change in bp (``WoW(bp)``).
-    ``kind`` filters rows: ``"tenor"``, ``"slope"``, ``"fly"`` or ``"all"``.
-    """
-    lvl = curve_levels(panel, market).resample("W-FRI").last()
-    met = curve_metrics(panel, market).resample("W-FRI").last()
-    units = {**{c: "%" for c in lvl.columns}, **{c: "bp" for c in met.columns}}
-    combined = pd.concat([lvl, met], axis=1).dropna(how="all").tail(weeks)
-
-    out = combined.T
-    out.columns = [c.date() for c in out.columns]
-    out.insert(0, "Unit", [units[m] for m in out.index])
-    if combined.shape[0] >= 2:
-        last, prev = out.columns[-1], out.columns[-2]
-        delta = out[last] - out[prev]
-        # express every weekly change in bp (tenors are in %, so scale by 100).
-        out["WoW(bp)"] = [
-            d * (BP if units[m] == "%" else 1.0) for m, d in delta.items()
-        ]
-
-    if kind == "tenor":
-        out = out.loc[out["Unit"] == "%"]
-    elif kind in ("slope", "fly"):
-        want = 3 if kind == "fly" else 2
-        out = out.loc[[m for m in out.index if str(m).count("s") == want]]
-    return out.round(3)
-
-
-def daily_transition(
-    panel: pd.DataFrame, market: str, *, sessions: int = WEEK, kind: str = "all"
-) -> pd.DataFrame:
-    """Daily levels over the last ``sessions`` business days (last week by default).
-
-    Same layout as :func:`weekly_transition` but columns are daily closes; the
-    ``WoW(bp)`` column is the trailing 5-session change (in bp).
-    """
-    lvl = curve_levels(panel, market)
-    met = curve_metrics(panel, market)
-    units = {**{c: "%" for c in lvl.columns}, **{c: "bp" for c in met.columns}}
-    daily = pd.concat([lvl, met], axis=1).dropna(how="all")
-    wow = daily.diff(WEEK).iloc[-1]  # trailing 5-session change, natural units
-    window = daily.tail(sessions)
-
-    out = window.T
-    out.columns = [c.date() for c in out.columns]
-    out.insert(0, "Unit", [units[m] for m in out.index])
-    out["WoW(bp)"] = [wow[m] * (BP if units[m] == "%" else 1.0) for m in out.index]
-
-    if kind == "tenor":
-        out = out.loc[out["Unit"] == "%"]
-    elif kind in ("slope", "fly"):
-        want = 3 if kind == "fly" else 2
-        out = out.loc[[m for m in out.index if str(m).count("s") == want]]
-    return out.round(3)
-
-
-# --------------------------------------------------------------------------- #
 # FX: dollar & yen (tie-in to the US-JP rate differential)
 # --------------------------------------------------------------------------- #
 FX_PRIMARY: Final[tuple[str, ...]] = ("USDJPY", "DXY")
@@ -697,64 +628,8 @@ def fx_rate_fairvalue(
 
 
 # --------------------------------------------------------------------------- #
-# Weekly summary
+# Weekly z-score matrix (heatmap)
 # --------------------------------------------------------------------------- #
-@dataclass
-class WeeklySummary:
-    """Container for the current-week snapshot artifacts."""
-
-    as_of: pd.Timestamp
-    table: pd.DataFrame  # level / WoW / z-score per asset
-    ohlc: pd.DataFrame  # O/H/L/C for the final week, per asset
-    zscores: pd.DataFrame  # full z-score time series
-    correlations: pd.DataFrame  # rolling correlations time series
-
-
-def _week_window(index: pd.DatetimeIndex, as_of: pd.Timestamp) -> pd.DatetimeIndex:
-    start = as_of - pd.Timedelta(days=6)
-    return index[(index >= start) & (index <= as_of)]
-
-
-def weekly_ohlc(panel: pd.DataFrame, as_of: pd.Timestamp) -> pd.DataFrame:
-    """Open/High/Low/Close over the final calendar week, per asset."""
-    week = panel.loc[_week_window(panel.index, as_of)]
-    return pd.DataFrame(
-        {
-            "Open": week.iloc[0],
-            "High": week.max(),
-            "Low": week.min(),
-            "Close": week.iloc[-1],
-        }
-    )
-
-
-def weekly_summary(panel: pd.DataFrame, *, window: int = VOL_WINDOW) -> WeeklySummary:
-    """Build the current-week summary table, OHLC and supporting series."""
-    enriched = augment(panel)
-    as_of = enriched.dropna(how="all").index.max()
-
-    zscores = momentum_zscores(enriched, window=window)
-    correlations = rolling_correlations(panel)
-
-    wow = horizon_change(enriched, WEEK)
-    cols = [c for c in enriched.columns]
-    table = pd.DataFrame(index=cols)
-    table["Level"] = enriched.loc[as_of, cols]
-    table["WoW"] = wow.loc[as_of, cols]
-    table["Z_1W"] = [
-        zscores.get(f"{c}_z1W", pd.Series(dtype=float)).get(as_of, np.nan) for c in cols
-    ]
-    table["Z_4W"] = [
-        zscores.get(f"{c}_z4W", pd.Series(dtype=float)).get(as_of, np.nan) for c in cols
-    ]
-    table["Type"] = ["Price" if c in PRICE_COLUMNS else "Yield/Spread" for c in cols]
-
-    ohlc = weekly_ohlc(enriched, as_of)
-    return WeeklySummary(
-        as_of=as_of, table=table, ohlc=ohlc, zscores=zscores, correlations=correlations
-    )
-
-
 def weekly_zscore_matrix(panel: pd.DataFrame, *, window: int = VOL_WINDOW) -> pd.Series:
     """Latest 1-week z-score per canonical asset (for the heatmap)."""
     enriched = augment(panel)

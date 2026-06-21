@@ -22,13 +22,11 @@ it — the front-end does **no** computation. Keep the two in sync: a new analyt
 ## Layout
 - `data_loader.py` — ingest (MoF/FRED/Yahoo), business-day align + ffill, Parquet cache.
 - `analytics.py` — curves, real yield, momentum z-scores, rolling corr, **rates: curve_metrics /
-  rates_snapshot / tenor_snapshot / curve_pca / weekly_transition / daily_transition**;
-  **correlations: cross_asset_correlations / rates_structure_correlations** (see Conventions).
+  rates_snapshot / tenor_snapshot / curve_pca**; **correlations: cross_asset_correlations /
+  rates_structure_correlations** (see Conventions).
 - `sectors.py` — S&P 500 / Nikkei 225 sector attribution (SPDR + TOPIX-17 ETF proxies) + index
   price history, cached to `data_cache/sector_panel.parquet` **separately** from the canonical
   panel (28 tickers stay out of `CANONICAL_COLUMNS`). Index weights are a documented static approx.
-- `visualizer.py` — standalone matplotlib plot helpers (`plot_curve_snapshot`, `plot_curve_pca`,
-  `plot_spreads`, `plot_butterflies`, `plot_spread_transition`, `plot_spread_daily`, …).
 - `web_export.py` — serialize panel + analytics + sectors to `web/public/data.json` (NaN→null,
   dates→ISO; series tail-trimmed to `SERIES_TAIL=504`). One `_section` builder per web block.
 - `web/` — **primary display**. `src/charts.ts` (Observable Plot), `src/theme.ts` (time-of-day
