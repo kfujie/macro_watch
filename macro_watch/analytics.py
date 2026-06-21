@@ -7,8 +7,9 @@ All functions are vectorized and operate on the canonical panel produced by
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from typing import Final, Mapping
+from typing import Callable, Final, Mapping
 
 import numpy as np
 import pandas as pd
@@ -203,7 +204,7 @@ def rolling_correlations(
 
 @dataclass
 class CorrelationPair:
-    """A pair of assets and their Pearson correlation over a trailing window."""
+    """A pair of series and their Pearson correlation over a trailing window."""
 
     a: str
     b: str
@@ -211,34 +212,102 @@ class CorrelationPair:
     n_obs: int
 
 
-def top_correlated_pairs(
-    panel: pd.DataFrame,
-    *,
-    window: int = MONTH,
-    min_obs: int = 15,
-    top_n: int = 8,
-) -> list[CorrelationPair]:
-    """Strongest co-moving asset pairs over the trailing ``window`` sessions.
+# Non-rate macro series (the "cross-asset" universe): FX, commodities, equities,
+# plus the real yield as a key macro driver. Outright tenors are deliberately
+# excluded everywhere (tenor-vs-tenor co-movement is mechanical / uninformative).
+MACRO_COLUMNS: Final[tuple[str, ...]] = (
+    FX_COLUMNS + COMMODITY_COLUMNS + EQUITY_COLUMNS + ("US10Y_REAL",)
+)
 
-    Correlations are computed on daily increments (log returns for prices,
-    absolute diffs for yields/spreads, via :func:`_daily_increments`) of the
-    augmented panel, over the last ``window`` sessions. Pairs are ranked by
-    absolute correlation (so strong *negative* relationships surface too).
-    Columns with fewer than ``min_obs`` observations in the window are dropped.
-    """
-    inc = _daily_increments(augment(panel)).tail(window)
+
+def _struct_columns(panel: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Curve slope & butterfly time series per market (the rate *structures*)."""
+    return {m: curve_metrics(panel, m) for m in CURVES}
+
+
+def _struct_tenors(name: str) -> tuple[str, frozenset[int]]:
+    """Parse a structure name (``US_5s10s30s``) into (market, {tenors})."""
+    market, _, rest = name.partition("_")
+    return market, frozenset(int(x) for x in re.findall(r"(\d+)s", rest))
+
+
+def _shares_leg(a: str, b: str) -> bool:
+    """True if two structures share a market and any tenor leg (mechanical overlap)."""
+    ma, ta = _struct_tenors(a)
+    mb, tb = _struct_tenors(b)
+    return ma == mb and bool(ta & tb)
+
+
+def _rank_pairs(
+    inc: pd.DataFrame,
+    *,
+    min_obs: int,
+    keep: Callable[[str, str], bool],
+) -> list[CorrelationPair]:
+    """Pearson-correlate increment columns, keep pairs passing ``keep``, rank by |ρ|."""
     inc = inc.loc[:, inc.notna().sum() >= min_obs]
     corr = inc.corr(min_periods=min_obs)
     cols = list(corr.columns)
     pairs: list[CorrelationPair] = []
     for i, a in enumerate(cols):
         for b in cols[i + 1 :]:
+            if not keep(a, b):
+                continue
             r = corr.at[a, b]
             if pd.notna(r):
                 n = int(inc[[a, b]].dropna().shape[0])
                 pairs.append(CorrelationPair(a, b, float(r), n))
     pairs.sort(key=lambda p: abs(p.corr), reverse=True)
-    return pairs[:top_n]
+    return pairs
+
+
+def cross_asset_levels(panel: pd.DataFrame) -> pd.DataFrame:
+    """Level frame for cross-asset correlation: macro series + curve structures."""
+    structs = _struct_columns(panel)
+    return pd.concat([augment(panel)[list(MACRO_COLUMNS)], *structs.values()], axis=1)
+
+
+def cross_asset_correlations(
+    panel: pd.DataFrame, *, window: int = MONTH, min_obs: int = 15, top_n: int = 8
+) -> list[CorrelationPair]:
+    """Strongest macro pairs over the last ``window`` sessions, excluding pure rates.
+
+    Universe = macro series (FX / commodities / equities / real yield) + curve
+    structures (slopes & butterflies). Outright tenors are excluded, and a pair
+    must include at least one macro leg — so a structure like ``US_5s10s30s``
+    only appears when it co-moves with a non-rate asset (e.g. a yen cross), never
+    paired with another structure. Ranked by absolute correlation.
+    """
+    structs = {c for df in _struct_columns(panel).values() for c in df.columns}
+    inc = _daily_increments(cross_asset_levels(panel)).tail(window)
+    macro = set(MACRO_COLUMNS)
+
+    def keep(a: str, b: str) -> bool:
+        # require >=1 macro leg; the other may be macro or a structure.
+        return (a in macro or b in macro) and not (a in structs and b in structs)
+
+    return _rank_pairs(inc, min_obs=min_obs, keep=keep)[:top_n]
+
+
+def rates_structure_levels(panel: pd.DataFrame) -> pd.DataFrame:
+    """Level frame of all curve slopes & butterflies (US + JP), bp."""
+    return pd.concat(_struct_columns(panel).values(), axis=1)
+
+
+def rates_structure_correlations(
+    panel: pd.DataFrame, *, window: int = MONTH, min_obs: int = 15, top_n: int = 8
+) -> list[CorrelationPair]:
+    """Strongest slope/butterfly co-movements over the last ``window`` sessions.
+
+    Universe = curve slopes & butterflies only (US + JP). Pairs sharing a market
+    and a tenor leg are dropped (e.g. 2s10s vs 5s10s share the 10Y, so their high
+    correlation is mechanical), surfacing genuine cross-structure / cross-market
+    relationships. Ranked by absolute correlation.
+    """
+    inc = _daily_increments(rates_structure_levels(panel)).tail(window)
+    return _rank_pairs(inc, min_obs=min_obs, keep=lambda a, b: not _shares_leg(a, b))[
+        :top_n
+    ]
 
 
 # --------------------------------------------------------------------------- #

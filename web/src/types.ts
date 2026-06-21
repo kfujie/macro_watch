@@ -114,6 +114,7 @@ export interface MacroData {
   markets: Record<string, Market>;
   fx: Fx;
   equities: Record<string, IndexAttribution>;
+  rates_correlations: Correlations;
   cross_asset: {
     zscores: { asset: string; z: number | null }[];
     oil_vs_bei: OilVsBei;

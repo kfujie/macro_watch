@@ -267,28 +267,31 @@ function crossAssetSection(data: MacroData): HTMLElement {
     ]),
     figure([oilVsBei(ob)]),
 
-    correlationBlock(data),
+    correlationBlock(
+      "Strongest correlation",
+      data.cross_asset.correlations,
+      CROSS_CORR_NOTE,
+    ),
 
     el("h3", { class: "sub" }, ["1-week momentum (z-scores)"]),
     figure([zscoreBars(data.cross_asset.zscores)]),
   ]);
 }
 
-function correlationBlock(data: MacroData): HTMLElement {
-  const c = data.cross_asset.correlations;
+function correlationBlock(
+  title: string,
+  c: MacroData["cross_asset"]["correlations"],
+  note: string,
+): HTMLElement {
   const h = c.highlight;
   const children: (Node | string)[] = [
-    el("h3", { class: "sub" }, [`Strongest correlation (last ${c.window_days}d)`]),
+    el("h3", { class: "sub" }, [`${title} (last ${c.window_days}d)`]),
   ];
   if (h) {
     const dir = h.corr >= 0 ? "move together" : "move inversely";
     children.push(
       el("div", { class: "stat-row" }, [
-        el("span", {}, [
-          el("b", {}, [h.a]),
-          " vs ",
-          el("b", {}, [h.b]),
-        ]),
+        el("span", {}, [el("b", {}, [h.a]), " vs ", el("b", {}, [h.b])]),
         el("span", {}, [
           "ρ ",
           el("b", { class: h.corr >= 0 ? "pos" : "neg" }, [
@@ -297,10 +300,7 @@ function correlationBlock(data: MacroData): HTMLElement {
         ]),
         el("span", { class: "muted-note" }, [`${h.n} sessions · they ${dir}`]),
       ]),
-      el("p", { class: "note" }, [
-        "Pearson correlation of daily increments (log returns for prices, yield " +
-          "changes for rates) over the last month; standardized levels shown below.",
-      ]),
+      el("p", { class: "note" }, [note]),
       el("div", { class: "grid-2" }, [
         card("Standardized paths", el("figure", {}, [correlationOverlay(h.series, h.a, h.b)])),
         card("Top pairs by |ρ|", correlationTable(c.ranked)),
@@ -310,6 +310,23 @@ function correlationBlock(data: MacroData): HTMLElement {
     children.push(el("p", { class: "note" }, ["Insufficient data this window."]));
   }
   return el("div", {}, children);
+}
+
+const CROSS_CORR_NOTE =
+  "Pearson correlation of daily increments over the last month. Outright rate " +
+  "tenors are excluded; curve structures (slopes/butterflies) appear only when " +
+  "they co-move with a non-rate asset. Standardized levels shown below.";
+
+const RATES_CORR_NOTE =
+  "Co-movement among curve slopes & butterflies (US + JP) over the last month. " +
+  "Pairs sharing a tenor leg are excluded (their correlation is mechanical), " +
+  "surfacing cross-structure and cross-market relationships.";
+
+function ratesCorrelationSection(data: MacroData): HTMLElement {
+  return el("section", {}, [
+    el("h2", { class: "section" }, ["Rates — slope & butterfly co-movement"]),
+    correlationBlock("Strongest pair", data.rates_correlations, RATES_CORR_NOTE),
+  ]);
 }
 
 function correlationTable(ranked: MacroData["cross_asset"]["correlations"]["ranked"]): HTMLElement {
@@ -342,6 +359,7 @@ function render(data: MacroData): void {
       el("span", { class: "as-of" }, [`as of ${data.as_of}`]),
     ]),
     ...Object.entries(data.markets).map(([name, m]) => marketSection(name, m)),
+    ratesCorrelationSection(data),
     fxSection(data),
     equitiesSection(data),
     crossAssetSection(data),

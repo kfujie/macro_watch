@@ -173,15 +173,15 @@ def _oil_vs_bei(panel: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def _correlations(panel: pd.DataFrame) -> dict[str, Any]:
-    """Strongest co-moving pairs over the last month + the leader's z-score paths."""
-    window = analytics.MONTH
-    pairs = analytics.top_correlated_pairs(panel, window=window, top_n=8)
+def _corr_block(
+    pairs: list[analytics.CorrelationPair], levels: pd.DataFrame, window: int
+) -> dict[str, Any]:
+    """Serialize ranked pairs + the leader's standardized (z-score) level paths."""
     ranked = [{"a": p.a, "b": p.b, "corr": _clean(p.corr), "n": p.n_obs} for p in pairs]
     highlight: Any = None
     if pairs:
         top = pairs[0]
-        lv = analytics.augment(panel)[[top.a, top.b]].dropna().tail(window)
+        lv = levels[[top.a, top.b]].dropna().tail(window)
         z = (lv - lv.mean()) / lv.std(ddof=0).replace(0.0, np.nan)
         highlight = {
             "a": top.a,
@@ -196,6 +196,18 @@ def _correlations(panel: pd.DataFrame) -> dict[str, Any]:
     return {"window_days": window, "ranked": ranked, "highlight": highlight}
 
 
+def _cross_asset_correlations(panel: pd.DataFrame) -> dict[str, Any]:
+    """Strongest cross-asset pairs (excl. outright rates) over the last month."""
+    pairs = analytics.cross_asset_correlations(panel, top_n=8)
+    return _corr_block(pairs, analytics.cross_asset_levels(panel), analytics.MONTH)
+
+
+def _rates_correlations(panel: pd.DataFrame) -> dict[str, Any]:
+    """Strongest slope/butterfly co-movements (no shared-leg pairs) over the month."""
+    pairs = analytics.rates_structure_correlations(panel, top_n=8)
+    return _corr_block(pairs, analytics.rates_structure_levels(panel), analytics.MONTH)
+
+
 def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, Any]:
     """Assemble the full front-end payload from the canonical panel."""
     as_of = panel.dropna(how="all").index.max()
@@ -205,12 +217,13 @@ def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, An
         "markets": {m: _market(panel, m) for m in CURVES},
         "fx": _fx(panel),
         "equities": _clean(sectors.build_equities(panel, refresh=refresh)),
+        "rates_correlations": _rates_correlations(panel),
         "cross_asset": {
             "zscores": _clean(
                 [{"asset": a, "z": v} for a, v in zmatrix.dropna().items()]
             ),
             "oil_vs_bei": _oil_vs_bei(panel),
-            "correlations": _correlations(panel),
+            "correlations": _cross_asset_correlations(panel),
         },
     }
 
