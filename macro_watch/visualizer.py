@@ -408,3 +408,47 @@ def plot_curve_transition(
     fig.suptitle(f"{_MARKET_TITLE[market]} Weekly Curve Transition", fontweight="bold")
     fig.tight_layout()
     return fig
+
+
+def plot_spread_transition(
+    panel: pd.DataFrame,
+    market: str,
+    names: tuple[str, ...],
+    *,
+    weeks: int = 8,
+    title: str | None = None,
+) -> Figure:
+    """Weekly transition of spread/butterfly levels: weekly-close bp per week.
+
+    One line per structure across the last ``weeks`` Friday closes (latest value
+    annotated), with the change vs the prior week per structure on the right.
+    """
+    weekly = curve_metrics(panel, market)[list(names)].resample("W-FRI").last()
+    weekly = weekly.dropna(how="all").tail(weeks)
+    xs = range(len(weekly))
+    labels = [ts.date().isoformat() for ts in weekly.index]
+
+    fig, (ax, axd) = plt.subplots(
+        1, 2, figsize=(13, 5), width_ratios=[2.0, 1.2]
+    )
+    for name in names:
+        y = weekly[name].to_numpy()
+        ax.plot(xs, y, "-o", lw=1.7, label=f"{name} ({y[-1]:+.1f})")
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set_xticks(list(xs), labels, rotation=45, fontsize=8)
+    ax.set_ylabel("bp")
+    ax.set_title(title or f"{_MARKET_TITLE[market]} butterfly weekly transition")
+    ax.legend(fontsize=8, title="latest (bp)")
+
+    wow = weekly.diff().iloc[-1]
+    colors = ["#c0392b" if v >= 0 else "#1f7a3d" for v in wow.to_numpy()]
+    axd.barh(range(len(names)), wow.to_numpy(), color=colors, alpha=0.85)
+    axd.axvline(0, color="black", lw=0.8)
+    axd.set_yticks(range(len(names)), list(names), fontsize=8)
+    axd.invert_yaxis()
+    axd.set_xlabel("WoW Δ (bp)")
+    axd.set_title("latest week-on-week")
+
+    fig.suptitle(f"{_MARKET_TITLE[market]} Butterfly Weekly Transition", fontweight="bold")
+    fig.tight_layout()
+    return fig

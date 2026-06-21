@@ -65,6 +65,8 @@ macro_watch/
 7. **Curve PCA** — loadings, factor history, and rich/cheap residual bars.
 8. **Weekly curve transition** — full curve overlaid at the last N weekly closes (oldest→newest)
    plus the week-on-week change by tenor.
+9. **Butterfly weekly transition** — each fly's level (bp) across the last N weekly closes with
+   the latest week-on-week change.
 
 ## Setup (uv)
 
