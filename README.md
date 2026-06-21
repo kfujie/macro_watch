@@ -1,8 +1,8 @@
 # macro_watch
 
-Production-grade toolkit for **weekly cross-asset macro market analysis**. It ingests, aligns,
-computes, and visualizes macro-financial data to summarize the week's market regimes from a
-macro trader's perspective.
+A toolkit for **weekly cross-asset macro market analysis**. It ingests, aligns, computes, and
+visualizes macro-financial data so you can read the week's rates, equity, and commodity regimes
+at a glance — with a focus on the US Treasury and JGB curves.
 
 ## Package layout
 

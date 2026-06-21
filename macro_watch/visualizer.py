@@ -294,7 +294,7 @@ def _plot_metric_panels(
     for ax, name in zip(axes, names):
         s = metrics[name].dropna()
         mu, sd = s.mean(), s.std(ddof=0)
-        ax.plot(s.index, s.to_numpy(), color=color, lw=1.3)            # actual spread (bp)
+        ax.plot(s.index, s.to_numpy(), color=color, lw=1.3)  # actual spread (bp)
         ax.axhline(mu, color="black", lw=0.8, ls="--", alpha=0.7)
         for k, a in ((1, 0.18), (2, 0.10)):
             ax.fill_between(s.index, mu - k * sd, mu + k * sd, color=color, alpha=a)
@@ -312,9 +312,12 @@ def plot_spreads(
 ) -> Figure:
     """Actual slope-spread (bp) time series with mean and ±1σ/±2σ bands."""
     return _plot_metric_panels(
-        panel, market, spreads,
+        panel,
+        market,
+        spreads,
         f"{_MARKET_TITLE[market]} Slopes — actual spread (bp), steeper = up",
-        lookback=lookback, color="#1f4e79",
+        lookback=lookback,
+        color="#1f4e79",
     )
 
 
@@ -323,9 +326,12 @@ def plot_butterflies(
 ) -> Figure:
     """Actual butterfly-spread (bp) time series with mean and ±1σ/±2σ bands."""
     return _plot_metric_panels(
-        panel, market, flies,
+        panel,
+        market,
+        flies,
         f"{_MARKET_TITLE[market]} Butterflies — actual spread (bp), belly cheap = up",
-        lookback=lookback, color="#7030a0",
+        lookback=lookback,
+        color="#7030a0",
     )
 
 
@@ -391,8 +397,12 @@ def plot_curve_transition(
     for color, (ts, row) in zip(shades, weekly.iterrows()):
         recent = ts == weekly.index[-1]
         ax.plot(
-            x, row[cols].to_numpy(), "-o" if recent else "-",
-            color=color, lw=2.4 if recent else 1.3, alpha=1.0 if recent else 0.8,
+            x,
+            row[cols].to_numpy(),
+            "-o" if recent else "-",
+            color=color,
+            lw=2.4 if recent else 1.3,
+            alpha=1.0 if recent else 0.8,
             label=ts.date().isoformat(),
         )
     ax.set_title(f"{_MARKET_TITLE[market]} curve — last {len(weekly)} weekly closes")
@@ -404,7 +414,9 @@ def plot_curve_transition(
 
     wdiff = weekly[cols].diff().dropna(how="all") * 100.0
     for color, (ts, row) in zip(shades[1:], wdiff.iterrows()):
-        axd.plot(x, row.to_numpy(), "-o", color=color, lw=1.4, label=ts.date().isoformat())
+        axd.plot(
+            x, row.to_numpy(), "-o", color=color, lw=1.4, label=ts.date().isoformat()
+        )
     axd.axhline(0, color="black", lw=0.8)
     axd.set_title("Week-on-week change by tenor (bp)")
     axd.set_xlabel("Tenor (Y)")
@@ -436,9 +448,7 @@ def plot_spread_transition(
     xs = range(len(weekly))
     labels = [ts.date().isoformat() for ts in weekly.index]
 
-    fig, (ax, axd) = plt.subplots(
-        1, 2, figsize=(13, 5), width_ratios=[2.0, 1.2]
-    )
+    fig, (ax, axd) = plt.subplots(1, 2, figsize=(13, 5), width_ratios=[2.0, 1.2])
     for name in names:
         y = weekly[name].to_numpy()
         ax.plot(xs, y, "-o", lw=1.7, label=f"{name} ({y[-1]:+.1f})")
@@ -457,7 +467,9 @@ def plot_spread_transition(
     axd.set_xlabel("WoW Δ (bp)")
     axd.set_title("latest week-on-week")
 
-    fig.suptitle(f"{_MARKET_TITLE[market]} Butterfly Weekly Transition", fontweight="bold")
+    fig.suptitle(
+        f"{_MARKET_TITLE[market]} Butterfly Weekly Transition", fontweight="bold"
+    )
     fig.tight_layout()
     return fig
 
@@ -484,7 +496,9 @@ def plot_spread_daily(
         y = window[name].to_numpy()
         ax.plot(window.index, y, "-o", lw=1.7, label=f"{name} ({y[-1]:+.1f})")
     if len(window) > WEEK:
-        ax.axvspan(window.index[-(WEEK + 1)], window.index[-1], color="grey", alpha=0.12)
+        ax.axvspan(
+            window.index[-(WEEK + 1)], window.index[-1], color="grey", alpha=0.12
+        )
     ax.axhline(0, color="black", lw=0.8)
     ax.set_ylabel("bp")
     ax.set_title(title or f"{_MARKET_TITLE[market]} daily (last week shaded)")
@@ -499,6 +513,8 @@ def plot_spread_daily(
     axd.set_xlabel("WoW Δ (bp, 5d)")
     axd.set_title("change over last week")
 
-    fig.suptitle(f"{_MARKET_TITLE[market]} Butterfly — Last Week (daily)", fontweight="bold")
+    fig.suptitle(
+        f"{_MARKET_TITLE[market]} Butterfly — Last Week (daily)", fontweight="bold"
+    )
     fig.tight_layout()
     return fig
