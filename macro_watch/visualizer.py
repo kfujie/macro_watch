@@ -13,6 +13,7 @@ from matplotlib.figure import Figure
 
 from macro_watch.analytics import (
     CURVES,
+    WEEK,
     PCAResult,
     augment,
     curve_levels,
@@ -450,5 +451,47 @@ def plot_spread_transition(
     axd.set_title("latest week-on-week")
 
     fig.suptitle(f"{_MARKET_TITLE[market]} Butterfly Weekly Transition", fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def plot_spread_daily(
+    panel: pd.DataFrame,
+    market: str,
+    names: tuple[str, ...],
+    *,
+    sessions: int = 10,
+    title: str | None = None,
+) -> Figure:
+    """Daily path of spread/butterfly levels (bp) over the last ``sessions`` days.
+
+    The last week (5 sessions) is shaded; the right panel shows each structure's
+    trailing 5-session (WoW) change in bp.
+    """
+    metrics = curve_metrics(panel, market)[list(names)]
+    window = metrics.dropna(how="all").tail(sessions)
+    wow = metrics.diff(WEEK).iloc[-1]
+
+    fig, (ax, axd) = plt.subplots(1, 2, figsize=(13, 5), width_ratios=[2.2, 1.0])
+    for name in names:
+        y = window[name].to_numpy()
+        ax.plot(window.index, y, "-o", lw=1.7, label=f"{name} ({y[-1]:+.1f})")
+    if len(window) > WEEK:
+        ax.axvspan(window.index[-(WEEK + 1)], window.index[-1], color="grey", alpha=0.12)
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set_ylabel("bp")
+    ax.set_title(title or f"{_MARKET_TITLE[market]} daily (last week shaded)")
+    ax.legend(fontsize=8, title="latest (bp)")
+    fig.autofmt_xdate(rotation=45)
+
+    colors = ["#c0392b" if v >= 0 else "#1f7a3d" for v in wow.to_numpy()]
+    axd.barh(range(len(names)), wow.to_numpy(), color=colors, alpha=0.85)
+    axd.axvline(0, color="black", lw=0.8)
+    axd.set_yticks(range(len(names)), list(names), fontsize=8)
+    axd.invert_yaxis()
+    axd.set_xlabel("WoW Δ (bp, 5d)")
+    axd.set_title("change over last week")
+
+    fig.suptitle(f"{_MARKET_TITLE[market]} Butterfly — Last Week (daily)", fontweight="bold")
     fig.tight_layout()
     return fig

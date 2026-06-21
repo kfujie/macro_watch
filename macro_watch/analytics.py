@@ -420,6 +420,34 @@ def weekly_transition(
     return out.round(3)
 
 
+def daily_transition(
+    panel: pd.DataFrame, market: str, *, sessions: int = WEEK, kind: str = "all"
+) -> pd.DataFrame:
+    """Daily levels over the last ``sessions`` business days (last week by default).
+
+    Same layout as :func:`weekly_transition` but columns are daily closes; the
+    ``WoW(bp)`` column is the trailing 5-session change (in bp).
+    """
+    lvl = curve_levels(panel, market)
+    met = curve_metrics(panel, market)
+    units = {**{c: "%" for c in lvl.columns}, **{c: "bp" for c in met.columns}}
+    daily = pd.concat([lvl, met], axis=1).dropna(how="all")
+    wow = daily.diff(WEEK).iloc[-1]  # trailing 5-session change, natural units
+    window = daily.tail(sessions)
+
+    out = window.T
+    out.columns = [c.date() for c in out.columns]
+    out.insert(0, "Unit", [units[m] for m in out.index])
+    out["WoW(bp)"] = [wow[m] * (BP if units[m] == "%" else 1.0) for m in out.index]
+
+    if kind == "tenor":
+        out = out.loc[out["Unit"] == "%"]
+    elif kind in ("slope", "fly"):
+        want = 3 if kind == "fly" else 2
+        out = out.loc[[m for m in out.index if str(m).count("s") == want]]
+    return out.round(3)
+
+
 # --------------------------------------------------------------------------- #
 # Weekly summary
 # --------------------------------------------------------------------------- #

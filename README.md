@@ -67,6 +67,8 @@ macro_watch/
    plus the week-on-week change by tenor.
 9. **Butterfly weekly transition** — each fly's level (bp) across the last N weekly closes with
    the latest week-on-week change.
+10. **Butterfly daily — last week** — the daily path of each fly over the last 5 sessions
+    (`daily_transition` / `plot_spread_daily`), last week shaded, with the WoW move per fly.
 
 ## Setup (uv)
 
