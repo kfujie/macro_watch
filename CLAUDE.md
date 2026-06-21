@@ -3,11 +3,10 @@
 Weekly cross-asset macro toolkit. **US Treasury & JGB curve analysis is the primary focus**;
 cross-asset (equity/commodity) is supporting context.
 
-**The web dashboard (`web/`) is now the primary display**; Python owns all compute and the
-notebook is the secondary/legacy view. Python writes one `web/public/data.json` (via
-`web_export.py`); the Vite + TypeScript + Observable Plot app renders it — the front-end does **no**
-computation. Keep the two in sync: a new analytic = a field in `web_export.py` + a type in
-`web/src/types.ts` + a chart/table in `web/src/`.
+**The web dashboard (`web/`) is the display**; Python owns all compute. Python writes one
+`web/public/data.json` (via `web_export.py`); the Vite + TypeScript + Observable Plot app renders
+it — the front-end does **no** computation. Keep the two in sync: a new analytic = a field in
+`web_export.py` + a type in `web/src/types.ts` + a chart/table in `web/src/`.
 
 ## Environment & commands
 - **uv-managed**, Python 3.13. Run everything via `uv run` (e.g. `uv run python -c ...`).
@@ -17,9 +16,7 @@ computation. Keep the two in sync: a new analytic = a field in `web_export.py` +
   export and reload when the data changes. `npm run build` runs `tsc --noEmit` (type-check only;
   **don't** drop `noEmit` — a bare `tsc` emits `src/*.js` that Vite resolves *before* the `.ts`
   sources and silently shadows them) then `vite build`.
-- Execute the notebook headless (legacy):
-  `cd macro_watch && uv run jupyter nbconvert --to notebook --execute --inplace weekly_report.ipynb --ExecutePreprocessor.timeout=300`
-- Package imports as `macro_watch.*` from the repo root (the notebook adds the parent to `sys.path`).
+- Package imports as `macro_watch.*` from the repo root.
 - Private GitHub repo: `kfujie/macro_watch`. Commit only when asked.
 
 ## Layout
@@ -30,15 +27,13 @@ computation. Keep the two in sync: a new analytic = a field in `web_export.py` +
 - `sectors.py` — S&P 500 / Nikkei 225 sector attribution (SPDR + TOPIX-17 ETF proxies) + index
   price history, cached to `data_cache/sector_panel.parquet` **separately** from the canonical
   panel (28 tickers stay out of `CANONICAL_COLUMNS`). Index weights are a documented static approx.
-- `visualizer.py` — matplotlib plots for the notebook (`plot_curve_snapshot`, `plot_curve_pca`,
+- `visualizer.py` — standalone matplotlib plot helpers (`plot_curve_snapshot`, `plot_curve_pca`,
   `plot_spreads`, `plot_butterflies`, `plot_spread_transition`, `plot_spread_daily`, …).
 - `web_export.py` — serialize panel + analytics + sectors to `web/public/data.json` (NaN→null,
   dates→ISO; series tail-trimmed to `SERIES_TAIL=504`). One `_section` builder per web block.
 - `web/` — **primary display**. `src/charts.ts` (Observable Plot), `src/theme.ts` (time-of-day
   theme), `src/ui.ts`, `src/main.ts`, `src/types.ts` (kept in lockstep with `web_export.py`).
   `public/data.json` is git-ignored (regenerated from sources).
-- `weekly_report.ipynb` (legacy) — §1 ingest, **§2 US Treasury & JGB (main)**, §3 cross-asset
-  backdrop, §4 markdown brief (leads with rates). `REFRESH=False` uses the cache.
 
 ## Web sections (`web/`, driven by `data.json`)
 Rates per market (curve snapshot + WoW bars, outright/slope-fly tables, **butterfly** band panels,

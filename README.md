@@ -6,7 +6,7 @@ at a glance — with a focus on the US Treasury and JGB curves.
 
 The **primary display is a browser dashboard** (Vite + TypeScript + Observable Plot) — see
 [Web view](#web-view). Python owns all ingestion and analytics and writes a JSON snapshot that the
-front-end renders; the original Jupyter notebook is kept as a secondary/legacy view.
+front-end renders.
 
 ## Package layout
 
@@ -16,9 +16,8 @@ macro_watch/
 ├── data_loader.py      # MoF (JGB), FRED, Yahoo ingestion + Parquet caching
 ├── analytics.py        # curves, real rates, rolling correlations, z-scores
 ├── sectors.py          # S&P 500 / Nikkei 225 sector attribution (ETF proxies)
-├── visualizer.py       # production-quality plots for the weekly brief
-├── web_export.py       # dump the panel + analytics to web/public/data.json
-└── weekly_report.ipynb # orchestrates the pipeline and renders the dashboard
+├── visualizer.py       # matplotlib plot helpers (standalone)
+└── web_export.py       # dump the panel + analytics to web/public/data.json
 
 web/                    # experimental Vite + TypeScript + Observable Plot dashboard
 ```
@@ -135,13 +134,7 @@ It renders rates (curve, slopes, **butterflies**, PCA), FX, equity **sector attr
 (S&P 500 / Nikkei 225), and the cross-asset z-score row. See [`web/README.md`](web/README.md) for
 the front-end layout.
 
-### Notebook (legacy)
-
-```bash
-uv run jupyter lab macro_watch/weekly_report.ipynb
-```
-
-Programmatic use:
+### Programmatic use
 
 ```python
 from macro_watch.data_loader import MacroDataLoader
