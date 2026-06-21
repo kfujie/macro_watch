@@ -43,8 +43,10 @@ macro_watch/
 **Rates deep-dive (US Treasury & JGB)** — `analytics.curve_metrics / rates_snapshot / tenor_snapshot / curve_pca`
 - **Slopes** — every standard pair in bps (US 2s5s/2s10s/5s10s/5s30s/10s30s/2s30s; JGB
   2s10s/5s10s/10s20s/10s30s/20s30s/2s30s/5s30s).
-- **Butterflies** — `2·belly − wings` (bps), belly-cheap positive (US 2s5s10s/5s7s10s/5s10s30s/10s20s30s;
-  JGB 2s5s10s/5s10s20s/10s20s30s/20s30s40s).
+- **Butterflies** — *tenor-weighted* curvature (belly richness vs the wings' yield/tenor
+  interpolation), belly-cheap positive, correct sign for unevenly-spaced flies like 5s10s20s
+  (US 2s5s10s/5s7s10s/5s10s30s/10s20s30s; JGB 2s5s10s/5s10s20s/10s20s30s/20s30s40s).
+  `fly_weighting="equal"` gives the simple 2:1:1 fly.
 - **Snapshots** — outright tenor and curve tables with WoW/1M moves (bps), momentum z-score
   (`Z_1W`), level richness z-score (`Z_level`), and trailing-year percentile.
 - **Curve PCA** — level/slope/curvature decomposition (sign-normalized PC1/PC2/PC3) with

@@ -217,11 +217,28 @@ def curve_levels(panel: pd.DataFrame, market: str) -> pd.DataFrame:
     return panel[cols]
 
 
-def curve_metrics(panel: pd.DataFrame, market: str) -> pd.DataFrame:
+def _fly_weights(short: int, belly: int, long: int) -> tuple[float, float]:
+    """Tenor-distance wing weights so the belly sits on the wings' interpolation."""
+    w_long = (belly - short) / (long - short)
+    return 1.0 - w_long, w_long
+
+
+def curve_metrics(
+    panel: pd.DataFrame, market: str, *, fly_weighting: str = "tenor"
+) -> pd.DataFrame:
     """All curve slopes and butterflies for ``market`` as time series (bps).
 
     Slope ``AsBs`` = (yield_B - yield_A) * 100.
-    Butterfly ``AsBsCs`` = (2*belly - short - long) * 100; positive = belly cheap.
+
+    Butterfly ``AsBsCs`` measures belly curvature; positive = belly cheap (yield
+    above the wings). Two conventions:
+
+    * ``"tenor"`` (default): belly minus the *tenor-distance-weighted* wings, i.e.
+      the belly's richness vs the straight line joining the wings in yield/tenor
+      space. This is the correct sign for unevenly-spaced flies (e.g. 5s10s20s,
+      where the 10Y belly is far from the 12.5Y midpoint of 5s/20s).
+    * ``"equal"``: the simple ``2*belly - short - long`` (Bloomberg-style 2:1:1),
+      which only reflects true curvature when the belly is the midpoint tenor.
     """
     curve = CURVES[market]
     slopes, flies = CURVE_STRUCTURES[market]
@@ -229,9 +246,12 @@ def curve_metrics(panel: pd.DataFrame, market: str) -> pd.DataFrame:
     for a, b in slopes:
         out[_slope_name(market, a, b)] = (panel[curve[b]] - panel[curve[a]]) * BP
     for s, b, lo in flies:
-        out[_fly_name(market, s, b, lo)] = (
-            2.0 * panel[curve[b]] - panel[curve[s]] - panel[curve[lo]]
-        ) * BP
+        if fly_weighting == "equal":
+            val = 2.0 * panel[curve[b]] - panel[curve[s]] - panel[curve[lo]]
+        else:  # "tenor": belly richness vs interpolated wings
+            w_s, w_l = _fly_weights(s, b, lo)
+            val = panel[curve[b]] - (w_s * panel[curve[s]] + w_l * panel[curve[lo]])
+        out[_fly_name(market, s, b, lo)] = val * BP
     return out
 
 
