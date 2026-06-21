@@ -201,6 +201,46 @@ def rolling_correlations(
     return out
 
 
+@dataclass
+class CorrelationPair:
+    """A pair of assets and their Pearson correlation over a trailing window."""
+
+    a: str
+    b: str
+    corr: float
+    n_obs: int
+
+
+def top_correlated_pairs(
+    panel: pd.DataFrame,
+    *,
+    window: int = MONTH,
+    min_obs: int = 15,
+    top_n: int = 8,
+) -> list[CorrelationPair]:
+    """Strongest co-moving asset pairs over the trailing ``window`` sessions.
+
+    Correlations are computed on daily increments (log returns for prices,
+    absolute diffs for yields/spreads, via :func:`_daily_increments`) of the
+    augmented panel, over the last ``window`` sessions. Pairs are ranked by
+    absolute correlation (so strong *negative* relationships surface too).
+    Columns with fewer than ``min_obs`` observations in the window are dropped.
+    """
+    inc = _daily_increments(augment(panel)).tail(window)
+    inc = inc.loc[:, inc.notna().sum() >= min_obs]
+    corr = inc.corr(min_periods=min_obs)
+    cols = list(corr.columns)
+    pairs: list[CorrelationPair] = []
+    for i, a in enumerate(cols):
+        for b in cols[i + 1 :]:
+            r = corr.at[a, b]
+            if pd.notna(r):
+                n = int(inc[[a, b]].dropna().shape[0])
+                pairs.append(CorrelationPair(a, b, float(r), n))
+    pairs.sort(key=lambda p: abs(p.corr), reverse=True)
+    return pairs[:top_n]
+
+
 # --------------------------------------------------------------------------- #
 # Rates: curves, slopes, butterflies, rich/cheap (US Treasury & JGB)
 # --------------------------------------------------------------------------- #

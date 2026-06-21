@@ -90,6 +90,25 @@ export interface OilVsBei {
   corr_60d: number | null;
 }
 
+export interface CorrPair {
+  a: string;
+  b: string;
+  corr: number;
+  n: number;
+}
+
+export interface CorrZPoint {
+  date: string;
+  a: number | null;
+  b: number | null;
+}
+
+export interface Correlations {
+  window_days: number;
+  ranked: CorrPair[];
+  highlight: (CorrPair & { series: CorrZPoint[] }) | null;
+}
+
 export interface MacroData {
   as_of: string;
   markets: Record<string, Market>;
@@ -98,6 +117,7 @@ export interface MacroData {
   cross_asset: {
     zscores: { asset: string; z: number | null }[];
     oil_vs_bei: OilVsBei;
+    correlations: Correlations;
   };
 }
 

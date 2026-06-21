@@ -173,6 +173,29 @@ def _oil_vs_bei(panel: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def _correlations(panel: pd.DataFrame) -> dict[str, Any]:
+    """Strongest co-moving pairs over the last month + the leader's z-score paths."""
+    window = analytics.MONTH
+    pairs = analytics.top_correlated_pairs(panel, window=window, top_n=8)
+    ranked = [{"a": p.a, "b": p.b, "corr": _clean(p.corr), "n": p.n_obs} for p in pairs]
+    highlight: Any = None
+    if pairs:
+        top = pairs[0]
+        lv = analytics.augment(panel)[[top.a, top.b]].dropna().tail(window)
+        z = (lv - lv.mean()) / lv.std(ddof=0).replace(0.0, np.nan)
+        highlight = {
+            "a": top.a,
+            "b": top.b,
+            "corr": _clean(top.corr),
+            "n": top.n_obs,
+            "series": [
+                {"date": d.date().isoformat(), "a": _clean(z.at[d, top.a]), "b": _clean(z.at[d, top.b])}
+                for d in lv.index
+            ],
+        }
+    return {"window_days": window, "ranked": ranked, "highlight": highlight}
+
+
 def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, Any]:
     """Assemble the full front-end payload from the canonical panel."""
     as_of = panel.dropna(how="all").index.max()
@@ -187,6 +210,7 @@ def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, An
                 [{"asset": a, "z": v} for a, v in zmatrix.dropna().items()]
             ),
             "oil_vs_bei": _oil_vs_bei(panel),
+            "correlations": _correlations(panel),
         },
     }
 

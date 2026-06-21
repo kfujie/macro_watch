@@ -1,5 +1,6 @@
 import * as Plot from "@observablehq/plot";
 import type {
+  CorrZPoint,
   Curve,
   Horizon,
   IndexAttribution,
@@ -306,6 +307,32 @@ export function sectorContribution(
         },
       ),
       Plot.ruleX([0], { stroke: ink(), strokeOpacity: 0.6 }),
+    ],
+  });
+}
+
+/** Standardized (z-score) paths of the two most-correlated assets over the window. */
+export function correlationOverlay(
+  series: CorrZPoint[],
+  aLabel: string,
+  bLabel: string,
+): HTMLElement | SVGSVGElement {
+  const rows = series.flatMap((p) => [
+    { date: new Date(p.date), z: p.a, who: aLabel },
+    { date: new Date(p.date), z: p.b, who: bLabel },
+  ]);
+  return Plot.plot({
+    style: base(),
+    height: 280,
+    marginLeft: 44,
+    marginRight: 16,
+    x: { label: null, grid: true, ...gridStroke() },
+    y: { label: "Standardized level (z)", grid: true, ...gridStroke() },
+    color: { domain: [aLabel, bLabel], range: [OIL, BEIC], legend: true },
+    marks: [
+      Plot.ruleY([0], { stroke: muted(), strokeOpacity: 0.4 }),
+      Plot.line(rows, { x: "date", y: "z", stroke: "who", strokeWidth: 1.6 }),
+      Plot.dot(rows, { x: "date", y: "z", fill: "who", r: 2 }),
     ],
   });
 }

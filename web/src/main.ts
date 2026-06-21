@@ -5,6 +5,7 @@ import { card, el, table } from "./ui";
 import {
   bflyStats,
   butterflyPanel,
+  correlationOverlay,
   curveSnapshot,
   oilVsBei,
   pcaCharts,
@@ -266,9 +267,71 @@ function crossAssetSection(data: MacroData): HTMLElement {
     ]),
     figure([oilVsBei(ob)]),
 
+    correlationBlock(data),
+
     el("h3", { class: "sub" }, ["1-week momentum (z-scores)"]),
     figure([zscoreBars(data.cross_asset.zscores)]),
   ]);
+}
+
+function correlationBlock(data: MacroData): HTMLElement {
+  const c = data.cross_asset.correlations;
+  const h = c.highlight;
+  const children: (Node | string)[] = [
+    el("h3", { class: "sub" }, [`Strongest correlation (last ${c.window_days}d)`]),
+  ];
+  if (h) {
+    const dir = h.corr >= 0 ? "move together" : "move inversely";
+    children.push(
+      el("div", { class: "stat-row" }, [
+        el("span", {}, [
+          el("b", {}, [h.a]),
+          " vs ",
+          el("b", {}, [h.b]),
+        ]),
+        el("span", {}, [
+          "ρ ",
+          el("b", { class: h.corr >= 0 ? "pos" : "neg" }, [
+            (h.corr >= 0 ? "+" : "") + h.corr.toFixed(2),
+          ]),
+        ]),
+        el("span", { class: "muted-note" }, [`${h.n} sessions · they ${dir}`]),
+      ]),
+      el("p", { class: "note" }, [
+        "Pearson correlation of daily increments (log returns for prices, yield " +
+          "changes for rates) over the last month; standardized levels shown below.",
+      ]),
+      el("div", { class: "grid-2" }, [
+        card("Standardized paths", el("figure", {}, [correlationOverlay(h.series, h.a, h.b)])),
+        card("Top pairs by |ρ|", correlationTable(c.ranked)),
+      ]),
+    );
+  } else {
+    children.push(el("p", { class: "note" }, ["Insufficient data this window."]));
+  }
+  return el("div", {}, children);
+}
+
+function correlationTable(ranked: MacroData["cross_asset"]["correlations"]["ranked"]): HTMLElement {
+  const head = el("thead", {}, [
+    el("tr", {}, [
+      el("th", {}, ["Pair"]),
+      el("th", {}, ["ρ"]),
+    ]),
+  ]);
+  const body = el(
+    "tbody",
+    {},
+    ranked.map((r) =>
+      el("tr", {}, [
+        el("td", {}, [`${r.a} · ${r.b}`]),
+        el("td", { class: r.corr >= 0 ? "pos" : "neg" }, [
+          (r.corr >= 0 ? "+" : "") + r.corr.toFixed(3),
+        ]),
+      ]),
+    ),
+  );
+  return el("table", {}, [head, body]);
 }
 
 function render(data: MacroData): void {
