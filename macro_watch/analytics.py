@@ -16,13 +16,14 @@ import pandas as pd
 from macro_watch.data_loader import (
     COMMODITY_COLUMNS,
     EQUITY_COLUMNS,
+    FX_COLUMNS,
     RATE_COLUMNS,
 )
 
 # Columns measured as yields/levels (use absolute daily changes, not log returns).
 YIELD_COLUMNS: Final[tuple[str, ...]] = RATE_COLUMNS
 # Columns measured as prices (use log returns).
-PRICE_COLUMNS: Final[tuple[str, ...]] = COMMODITY_COLUMNS + EQUITY_COLUMNS
+PRICE_COLUMNS: Final[tuple[str, ...]] = COMMODITY_COLUMNS + FX_COLUMNS + EQUITY_COLUMNS
 
 WEEK: Final[int] = 5  # trading sessions per week
 MONTH: Final[int] = 20  # trading sessions per month
@@ -446,6 +447,106 @@ def daily_transition(
         want = 3 if kind == "fly" else 2
         out = out.loc[[m for m in out.index if str(m).count("s") == want]]
     return out.round(3)
+
+
+# --------------------------------------------------------------------------- #
+# FX: dollar & yen (tie-in to the US-JP rate differential)
+# --------------------------------------------------------------------------- #
+FX_PRIMARY: Final[tuple[str, ...]] = ("USDJPY", "DXY")
+
+
+def rate_differential(
+    panel: pd.DataFrame, tenor: int = 10, *, base: str = "US", quote: str = "JP"
+) -> pd.Series:
+    """Nominal yield differential ``base - quote`` at ``tenor`` (bps).
+
+    Default US-JP 10Y — the dominant macro driver of USD/JPY.
+    """
+    a, b = f"{base}{tenor}Y", f"{quote}{tenor}Y"
+    return ((panel[a] - panel[b]) * BP).rename(f"{a}-{b}")
+
+
+def fx_snapshot(panel: pd.DataFrame, *, window: int = VOL_WINDOW) -> pd.DataFrame:
+    """FX levels with WoW/1M % moves and momentum z-scores.
+
+    For USD-base pairs (USDJPY, DXY, EURJPY) a higher level = stronger USD/weaker
+    quote; EURUSD is the exception (higher = weaker USD).
+    """
+    px = panel[list(FX_COLUMNS)].dropna(how="all")
+    as_of = px.index.max()
+    lr = _safe_log(px) if isinstance(px, pd.Series) else px.apply(_safe_log)
+    daily = lr.diff()
+    vol = daily.rolling(window, min_periods=max(5, window // 3)).std(ddof=0)
+
+    table = pd.DataFrame(index=px.columns)
+    table["Level"] = px.loc[as_of]
+    table["WoW%"] = lr.diff(WEEK).loc[as_of] * 100.0
+    table["1M%"] = lr.diff(MONTH).loc[as_of] * 100.0
+    table["Z_1W"] = (lr.diff(WEEK) / (vol * np.sqrt(WEEK)).replace(0.0, np.nan)).loc[as_of]
+    table["Z_4W"] = (lr.diff(MONTH) / (vol * np.sqrt(MONTH)).replace(0.0, np.nan)).loc[as_of]
+    return table.round(3)
+
+
+@dataclass
+class FXFairValue:
+    """OLS of an FX pair on a rate differential (yen rich/cheap vs rates)."""
+
+    pair: str
+    driver: str
+    as_of: pd.Timestamp
+    beta: float          # FX units per bp of differential
+    alpha: float
+    r2: float
+    fitted: pd.Series    # model-implied FX level
+    residual: pd.Series  # actual - fitted (FX units; + = pair rich vs rates)
+    resid_z: float       # current residual in std units
+
+
+def fx_rate_fairvalue(
+    panel: pd.DataFrame,
+    pair: str = "USDJPY",
+    *,
+    tenor: int = 10,
+    lookback: int = 1260,
+    base: str = "US",
+    quote: str = "JP",
+) -> FXFairValue:
+    """Regress ``pair`` on the ``base-quote`` ``tenor`` differential over ``lookback``.
+
+    The residual flags how far the pair trades from its rate-implied fair value
+    (for USDJPY: positive residual = yen *cheaper* than the differential implies).
+    The default ``lookback`` is ~5y to capture the structural (positive-beta)
+    relationship; the sign can invert in short windows when other drivers (flows,
+    real yields, intervention) dominate, so check ``r2``/``beta`` before trusting it.
+    """
+    diff = rate_differential(panel, tenor, base=base, quote=quote)
+    df = pd.concat([panel[pair].rename(pair), diff], axis=1).dropna()
+    if lookback:
+        df = df.tail(lookback)
+    if len(df) < 10:
+        raise ValueError(f"Insufficient overlap for {pair} vs {diff.name} fair value.")
+
+    x = df[diff.name].to_numpy()
+    y = df[pair].to_numpy()
+    beta, alpha = np.polyfit(x, y, 1)
+    fitted = beta * x + alpha
+    resid = y - fitted
+    ss_res = float(np.sum(resid**2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2))
+    r2 = 1.0 - ss_res / ss_tot if ss_tot else float("nan")
+    sd = resid.std(ddof=0)
+
+    return FXFairValue(
+        pair=pair,
+        driver=str(diff.name),
+        as_of=df.index.max(),
+        beta=float(beta),
+        alpha=float(alpha),
+        r2=float(r2),
+        fitted=pd.Series(fitted, index=df.index, name="fitted"),
+        residual=pd.Series(resid, index=df.index, name="residual"),
+        resid_z=float(resid[-1] / sd) if sd else 0.0,
+    )
 
 
 # --------------------------------------------------------------------------- #

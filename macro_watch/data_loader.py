@@ -70,6 +70,11 @@ YAHOO_TICKER_MAP: Final[Mapping[str, str]] = {
     "^N225": "N225",
     "^TOPX": "TOPIX",
     "GC=F": "GOLD",
+    # FX: USD/JPY and the ICE dollar index are primary; EUR crosses for context.
+    "JPY=X": "USDJPY",
+    "DX-Y.NYB": "DXY",
+    "EURUSD=X": "EURUSD",
+    "EURJPY=X": "EURJPY",
 }
 
 # Deterministic schema: order matters for Parquet validation.
@@ -94,9 +99,10 @@ RATE_COLUMNS: Final[tuple[str, ...]] = (
     US_TENOR_COLUMNS + ("US10Y_BEI",) + JP_TENOR_COLUMNS
 )
 COMMODITY_COLUMNS: Final[tuple[str, ...]] = ("WTI", "GOLD")
+FX_COLUMNS: Final[tuple[str, ...]] = ("USDJPY", "DXY", "EURUSD", "EURJPY")
 EQUITY_COLUMNS: Final[tuple[str, ...]] = ("SPX", "NDX", "N225", "TOPIX")
 CANONICAL_COLUMNS: Final[tuple[str, ...]] = (
-    RATE_COLUMNS + COMMODITY_COLUMNS + EQUITY_COLUMNS
+    RATE_COLUMNS + COMMODITY_COLUMNS + FX_COLUMNS + EQUITY_COLUMNS
 )
 
 # Japanese era -> (Gregorian year of era-year 1) minus 1, i.e. offset.

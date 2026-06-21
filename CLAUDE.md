@@ -32,6 +32,11 @@ cross-asset (equity/commodity) is supporting context.
 - **Gold**: spec's `GOLDAMGBD228NLBM` is **de-listed (HTTP 404)** → gold comes from **Yahoo `GC=F`**.
 - **TOPIX (`^TOPX`)**: no free Yahoo history → the `TOPIX` column is **all-NaN**, handled gracefully
   (dropped from the heatmap).
+- **FX (Yahoo)**: USD/JPY = `JPY=X`, dollar index = `DX-Y.NYB` (NOT `DX=F`, which 404s),
+  `EURUSD=X`, `EURJPY=X`. Yen & dollar are the primary FX focus. The USD/JPY↔(US−JP rate
+  differential) **regression beta is regime-dependent**: positive over multi-year windows, but it
+  inverts in short windows — `fx_rate_fairvalue` defaults to a ~5y (`lookback=1260`) window for the
+  structural relationship. Don't "fix" a negative short-window beta; it's real.
 - **JGB lags US by ~1 session**: MoF prints a day behind FRED/Yahoo, so the latest JGB values are
   often `ffill`ed to the as-of date.
 

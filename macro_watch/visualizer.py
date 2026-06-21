@@ -14,11 +14,14 @@ from matplotlib.figure import Figure
 from macro_watch.analytics import (
     CURVES,
     WEEK,
+    FXFairValue,
     PCAResult,
     augment,
     curve_levels,
     curve_metrics,
     curve_pca,
+    fx_rate_fairvalue,
+    rate_differential,
     rates_snapshot,
     weekly_zscore_matrix,
 )
@@ -426,6 +429,83 @@ def plot_curve_transition(
     axd.legend(frameon=True, fontsize=7, ncol=2, title="week ending")
 
     fig.suptitle(f"{_MARKET_TITLE[market]} Weekly Curve Transition", fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+# --------------------------------------------------------------------------- #
+# 5. FX — dollar & yen
+# --------------------------------------------------------------------------- #
+def plot_fx_overview(panel: pd.DataFrame, *, lookback: int = 504) -> Figure:
+    """USD/JPY and the dollar index (primary) over the lookback, normalized z-bands."""
+    fig, axes = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
+    for ax, (col, label, color) in zip(
+        axes,
+        (("USDJPY", "USD/JPY", "#b8002e"), ("DXY", "US Dollar Index (DXY)", "#1f4e79")),
+    ):
+        s = panel[col].dropna().tail(lookback)
+        ax.plot(s.index, s.to_numpy(), color=color, lw=1.6)
+        ax.set_ylabel(label, color=color)
+        ax.set_title(f"{label}   last={s.iloc[-1]:.2f}")
+    axes[1].set_xlabel("Date")
+    fig.suptitle("FX — Dollar & Yen", fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def plot_usdjpy_vs_differential(
+    panel: pd.DataFrame, *, tenor: int = 10, lookback: int = 504
+) -> Figure:
+    """Dual-axis USD/JPY vs the US-JP nominal yield differential (the key driver)."""
+    diff = rate_differential(panel, tenor)
+    fig, ax = plt.subplots(figsize=(12, 5))
+    _dual_axis(
+        ax,
+        panel["USDJPY"].tail(lookback),
+        diff.tail(lookback),
+        "USD/JPY",
+        f"US-JP {tenor}Y differential (bp)",
+        left_color="#b8002e",
+        right_color="#1f4e79",
+    )
+    ax.set_title(f"USD/JPY vs US-JP {tenor}Y Yield Differential")
+    ax.set_xlabel("Date")
+    fig.tight_layout()
+    return fig
+
+
+def plot_fx_fairvalue(
+    panel: pd.DataFrame, pair: str = "USDJPY", *, tenor: int = 10, lookback: int = 1260
+) -> Figure:
+    """Scatter of the pair vs the rate differential with the OLS fit, plus the
+    rich/cheap residual time series (+ = pair cheap vs rates)."""
+    fv: FXFairValue = fx_rate_fairvalue(panel, pair, tenor=tenor, lookback=lookback)
+    diff = rate_differential(panel, tenor).reindex(fv.fitted.index)
+
+    fig, (ax, axr) = plt.subplots(1, 2, figsize=(13, 5), width_ratios=[1.1, 1.4])
+    ax.scatter(diff.to_numpy(), panel[pair].reindex(diff.index).to_numpy(),
+               s=10, alpha=0.35, color="#6b6b6b")
+    order = np.argsort(diff.to_numpy())
+    ax.plot(diff.to_numpy()[order], fv.fitted.to_numpy()[order], color="#1f4e79", lw=2.0,
+            label=f"fit: β={fv.beta:.3f}/bp, R²={fv.r2:.2f}")
+    ax.scatter([diff.iloc[-1]], [panel[pair].reindex(diff.index).iloc[-1]],
+               s=90, color="#b8002e", zorder=5, label=f"now ({fv.as_of.date()})")
+    ax.set_xlabel(f"{fv.driver} (bp)")
+    ax.set_ylabel(pair)
+    ax.set_title(f"{pair} vs rate differential")
+    ax.legend(fontsize=8)
+
+    resid = fv.residual
+    sd = resid.std(ddof=0)
+    axr.plot(resid.index, resid.to_numpy(), color="#7030a0", lw=1.3)
+    axr.axhline(0, color="black", lw=0.8)
+    for k, a in ((1, 0.18), (2, 0.10)):
+        axr.fill_between(resid.index, -k * sd, k * sd, color="#7030a0", alpha=a)
+    axr.set_title(f"Residual (+ = {pair} cheap vs rates)   z={fv.resid_z:+.2f}")
+    axr.set_ylabel("FX units")
+    axr.set_xlabel("Date")
+
+    fig.suptitle(f"{pair} Rate-Differential Fair Value", fontweight="bold")
     fig.tight_layout()
     return fig
 

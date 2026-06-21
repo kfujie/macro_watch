@@ -22,6 +22,7 @@ macro_watch/
 | JP rates    | JGB 2Y / 5Y / 10Y / 20Y / 30Y / 40Y                         | MoF Japan (Shift-JIS CSV, Japanese-era dates) |
 | US rates    | UST 2Y / 3Y / 5Y / 7Y / 10Y / 20Y / 30Y, T10YIE (10Y breakeven) | FRED (keyless `fredgraph.csv`) |
 | Commodities | WTI (`DCOILWTICO`), Gold                                    | FRED / Yahoo `GC=F` |
+| FX          | USD/JPY (`JPY=X`), DXY (`DX-Y.NYB`), EUR/USD, EUR/JPY       | Yahoo Finance |
 | Equities    | `^GSPC`, `^IXIC`, `^N225`, `^TOPX`                          | Yahoo Finance (adjusted close) |
 
 **Source notes**
@@ -54,6 +55,13 @@ macro_watch/
 - **Weekly transition** (`weekly_transition`) — week-ending (W-FRI) levels across the last N
   weeks for tenors / slopes / flies, with the latest `WoW(bp)`.
 
+**FX — dollar & yen** — `analytics.fx_snapshot / rate_differential / fx_rate_fairvalue`
+- **FX momentum** — USD/JPY, DXY (primary), EUR/USD, EUR/JPY with WoW/1M % and z-scores.
+- **Rate differential** — US−JP nominal yield gap (bp), the dominant USD/JPY driver.
+- **Rate-differential fair value** — OLS of USD/JPY on the US−JP differential (~5y default);
+  residual = how far the yen trades from its rate-implied level (+ = yen cheap). Beta is
+  regime-dependent (positive structurally, can invert short-term) — check `r2`/`beta`.
+
 ## Visualizations
 
 1. **Weekly cross-asset z-score heatmap** — magnitude of the week's moves across all blocks.
@@ -69,6 +77,8 @@ macro_watch/
    the latest week-on-week change.
 10. **Butterfly daily — last week** — the daily path of each fly over the last 5 sessions
     (`daily_transition` / `plot_spread_daily`), last week shaded, with the WoW move per fly.
+11. **FX — dollar & yen** — USD/JPY & DXY overview, USD/JPY vs the US−JP differential (dual-axis),
+    and the rate-differential fair-value scatter + residual.
 
 ## Setup (uv)
 
