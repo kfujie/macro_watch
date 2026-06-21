@@ -8,6 +8,12 @@ The **primary display is a browser dashboard** (Vite + TypeScript + Observable P
 [Web view](#web-view). Python owns all ingestion and analytics and writes a JSON snapshot that the
 front-end renders.
 
+### 🔗 Live dashboard → **https://kfujie.github.io/macro_watch/**
+
+Published to GitHub Pages and **auto-refreshed daily** (23:00 UTC, after the US cash close) via
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) — no setup needed to just browse the
+latest read. To run it locally instead, see [Web view](#web-view).
+
 ## Package layout
 
 ```text
@@ -90,8 +96,9 @@ uv sync   # install Python dependencies into .venv
 
 ### Web view
 
-The primary display. The pipeline is decoupled: Python writes a JSON snapshot, TypeScript renders
-it — the front-end does no computation.
+The primary display. The live build is hosted at **https://kfujie.github.io/macro_watch/**
+(auto-refreshed daily); the steps below are for running it locally. The pipeline is decoupled:
+Python writes a JSON snapshot, TypeScript renders it — the front-end does no computation.
 
 ```text
 macro_watch (Python)            web/ (TypeScript)
