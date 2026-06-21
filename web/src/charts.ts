@@ -250,6 +250,42 @@ export function butterflyPanel(
   });
 }
 
+/** Weekly realized-vol (bp) transition, one line per market; y-axis auto-scales. */
+export function ratesVolatility(
+  series: { label: string; color: string; points: SeriesPoint[] }[],
+): HTMLElement | SVGSVGElement {
+  const rows = series.flatMap((s) =>
+    s.points
+      .filter((p) => p.value !== null)
+      .map((p) => ({ date: new Date(p.date), value: p.value as number, who: s.label })),
+  );
+  return Plot.plot({
+    style: base(),
+    height: 300,
+    marginLeft: 50,
+    marginRight: 16,
+    x: { label: null, grid: true, ...gridStroke() },
+    y: { label: "Weekly σ (bp)", grid: true, ...gridStroke() },
+    color: {
+      domain: series.map((s) => s.label),
+      range: series.map((s) => s.color),
+      legend: true,
+    },
+    marks: [
+      Plot.line(rows, { x: "date", y: "value", stroke: "who", strokeWidth: 1.5 }),
+      Plot.tip(
+        rows,
+        Plot.pointer({
+          x: "date",
+          y: "value",
+          title: (d: { who: string; value: number }) =>
+            `${d.who}\n${d.value.toFixed(1)} bp/wk`,
+        }),
+      ),
+    ],
+  });
+}
+
 /** Index price transition: a simple level line over the available history. */
 export function priceTransition(
   points: SeriesPoint[],

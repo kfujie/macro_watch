@@ -151,3 +151,26 @@ def test_fx_fairvalue_recovers_structural_beta():
     assert fv.r2 > 0.9
     # residual is actual - fitted, so it sums to ~0 over the fit window.
     assert abs(float(fv.residual.mean())) < 0.1
+
+
+# --------------------------------------------------------------------------- #
+# Benchmark yield volatility (weekly, in bp)
+# --------------------------------------------------------------------------- #
+def test_benchmark_yield_volatility_is_weekly_bp():
+    idx = pd.bdate_range("2022-01-03", periods=60)
+    rng = np.random.default_rng(7)
+    us = 2.0 + np.cumsum(rng.normal(0, 0.03, len(idx)))  # US10Y random walk, %
+    panel = pd.DataFrame({"US10Y": us, "JP10Y": 1.5}, index=idx)  # JP10Y flat
+    vol = analytics.benchmark_yield_volatility(panel, window=20, horizon=5)
+
+    assert list(vol.columns) == ["US", "JP"]
+    # Flat yield -> zero realized volatility.
+    assert float(vol["JP"].dropna().iloc[-1]) == pytest.approx(0.0, abs=1e-9)
+    # bp scaling (x100) and weekly scaling (x sqrt(5)) over the rolling window.
+    expected = (
+        panel["US10Y"].diff().rolling(20, min_periods=10).std(ddof=0).iloc[-1]
+        * np.sqrt(5)
+        * 100.0
+    )
+    assert float(vol["US"].iloc[-1]) == pytest.approx(expected)
+    assert (vol["US"].dropna() >= 0).all()  # volatility is non-negative

@@ -10,6 +10,7 @@ import {
   oilVsBei,
   pcaCharts,
   priceTransition,
+  ratesVolatility,
   sectorContribution,
   SLOPE_COLOR,
   usdjpyVsDifferential,
@@ -155,6 +156,35 @@ function marketSection(name: string, m: Market): HTMLElement {
       card("Factor loadings", figure([pcaCharts(m.pca)[0]!])),
       card("Rich / cheap residual", figure([pcaCharts(m.pca)[1]!])),
     ]),
+  ]);
+}
+
+/** Per-market accent for the weekly-volatility lines. */
+const MARKET_VOL_COLOR: Record<string, string> = {
+  US: "#d4a017",
+  JP: "#52b6a8",
+};
+
+function ratesVolatilitySection(data: MacroData): HTMLElement {
+  const rv = data.rates_volatility;
+  const series = rv.series
+    .filter((s) => s.points.length > 0)
+    .map((s) => ({
+      label: MARKET_TITLE[s.market] ?? s.market,
+      color: MARKET_VOL_COLOR[s.market] ?? "#8b98a8",
+      points: s.points,
+    }));
+  const body = series.length
+    ? figure([ratesVolatility(series)])
+    : el("p", { class: "note" }, ["No volatility data this window."]);
+  return el("section", {}, [
+    el("h2", { class: "section" }, ["Rates — weekly yield volatility"]),
+    el("p", { class: "note" }, [
+      `Realized volatility of the ${rv.tenor}Y benchmark yield: rolling ${rv.window_days}-session ` +
+        `stdev of daily changes, scaled to a ${rv.horizon_days}-session (weekly) move, in bp. ` +
+        `Higher = a more turbulent rates market.`,
+    ]),
+    body,
   ]);
 }
 
@@ -430,6 +460,7 @@ function render(data: MacroData): void {
       ]),
     ]),
     ...Object.entries(data.markets).map(([name, m]) => marketSection(name, m)),
+    ratesVolatilitySection(data),
     ratesCorrelationSection(data),
     fxSection(data),
     equitiesSection(data),

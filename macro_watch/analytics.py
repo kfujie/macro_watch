@@ -152,6 +152,33 @@ def rolling_volatility(
     return vol * ANNUALIZER if annualize else vol
 
 
+def benchmark_yield_volatility(
+    panel: pd.DataFrame,
+    *,
+    tenor: int = 10,
+    window: int = MONTH,
+    horizon: int = WEEK,
+) -> pd.DataFrame:
+    """Rolling realized volatility of each market's benchmark-tenor yield, in bp.
+
+    For every curve in :data:`CURVES`, take the daily change of the ``tenor``-year
+    yield, its rolling ``window``-session population std, then scale to a
+    ``horizon``-session ("weekly") move (·√horizon) and to basis points (·100).
+    Columns are market keys (``US``/``JP``); a market lacking the tenor, or whose
+    benchmark is entirely NaN (e.g. JGB when MoF is unreachable), yields an all-NaN
+    column that the exporter drops.
+    """
+    out = pd.DataFrame(index=panel.index)
+    scale = float(np.sqrt(horizon)) * 100.0
+    min_p = max(WEEK, window // 2)
+    for market, curve in CURVES.items():
+        col = curve.get(tenor)
+        if col and col in panel:
+            daily = panel[col].diff()
+            out[market] = daily.rolling(window, min_periods=min_p).std(ddof=0) * scale
+    return out
+
+
 def horizon_change(panel: pd.DataFrame, horizon: int) -> pd.DataFrame:
     """Change over ``horizon`` sessions: log return for prices, diff for yields."""
     out = pd.DataFrame(index=panel.index)

@@ -45,6 +45,18 @@ export interface Market {
   pca: Pca;
 }
 
+export interface VolSeries {
+  market: string;
+  points: SeriesPoint[];
+}
+
+export interface RatesVolatility {
+  tenor: number;
+  window_days: number;
+  horizon_days: number;
+  series: VolSeries[];
+}
+
 export interface Fx {
   table: Row[];
   usdjpy: SeriesPoint[];
@@ -113,6 +125,7 @@ export interface Correlations {
 export interface MacroData {
   as_of: string;
   markets: Record<string, Market>;
+  rates_volatility: RatesVolatility;
   fx: Fx;
   equities: Record<string, IndexAttribution>;
   rates_correlations: Correlations;

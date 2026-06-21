@@ -223,6 +223,22 @@ def _rates_correlations(panel: pd.DataFrame) -> dict[str, Any]:
     return _corr_block(pairs, analytics.rates_structure_levels(panel), analytics.MONTH)
 
 
+def _rates_volatility(panel: pd.DataFrame) -> dict[str, Any]:
+    """Weekly realized vol (bp) of each market's 10Y benchmark yield, over time."""
+    vol = analytics.benchmark_yield_volatility(panel).tail(SERIES_TAIL)
+    series = [
+        {"market": market, "points": _series(vol[market])}
+        for market in CURVES
+        if market in vol.columns and bool(vol[market].notna().any())
+    ]
+    return {
+        "tenor": 10,
+        "window_days": analytics.MONTH,
+        "horizon_days": analytics.WEEK,
+        "series": series,
+    }
+
+
 def _has_data(panel: pd.DataFrame, market: str) -> bool:
     """True if any of a market's curve tenors has a value (else it's been skipped)."""
     cols = [c for c in CURVES[market].values() if c in panel]
@@ -241,6 +257,7 @@ def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, An
     return {
         "as_of": as_of.date().isoformat(),
         "markets": {m: _market(panel, m) for m in CURVES if _has_data(panel, m)},
+        "rates_volatility": _rates_volatility(panel),
         "fx": _fx(panel),
         "equities": _clean(sectors.build_equities(panel, refresh=refresh)),
         "rates_correlations": _rates_correlations(panel),
