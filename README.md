@@ -4,6 +4,9 @@ A toolkit for **weekly cross-asset macro market analysis**. It ingests, aligns, 
 visualizes macro-financial data so you can read the week's rates, equity, and commodity regimes
 at a glance — with a focus on the US Treasury and JGB curves.
 
+Two front-ends consume the same Python analytics: the original Jupyter notebook, and an
+experimental browser dashboard (Vite + TypeScript) — see [Web view](#web-view-experimental).
+
 ## Package layout
 
 ```text
@@ -11,9 +14,16 @@ macro_watch/
 ├── __init__.py
 ├── data_loader.py      # MoF (JGB), FRED, Yahoo ingestion + Parquet caching
 ├── analytics.py        # curves, real rates, rolling correlations, z-scores
+├── sectors.py          # S&P 500 / Nikkei 225 sector attribution (ETF proxies)
 ├── visualizer.py       # production-quality plots for the weekly brief
+├── web_export.py       # dump the panel + analytics to web/public/data.json
 └── weekly_report.ipynb # orchestrates the pipeline and renders the dashboard
+
+web/                    # experimental Vite + TypeScript + Observable Plot dashboard
 ```
+
+Python is the single source of truth for ingestion and analytics; the web front-end does **no**
+computation — `web_export.py` writes one `data.json` that the TypeScript app renders.
 
 ## Data sources
 
@@ -24,6 +34,7 @@ macro_watch/
 | Commodities | WTI (`DCOILWTICO`), Gold                                    | FRED / Yahoo `GC=F` |
 | FX          | USD/JPY (`JPY=X`), DXY (`DX-Y.NYB`), EUR/USD, EUR/JPY       | Yahoo Finance |
 | Equities    | `^GSPC`, `^IXIC`, `^N225`, `^TOPX`                          | Yahoo Finance (adjusted close) |
+| Sector ETFs | 11 SPDR Select Sector (US, e.g. `XLK`), 17 NEXT FUNDS TOPIX-17 (JP, `1617.T`–`1633.T`) | Yahoo Finance (sector-attribution proxies) |
 
 **Source notes**
 - The spec's JGB URL (`jgbcm.csv`) carries only the current month; it is combined with the
@@ -61,6 +72,16 @@ macro_watch/
 - **Rate-differential fair value** — OLS of USD/JPY on the US−JP differential (~5y default);
   residual = how far the yen trades from its rate-implied level (+ = yen cheap). Beta is
   regime-dependent (positive structurally, can invert short-term) — check `r2`/`beta`.
+
+**Equities — sector attribution** — `sectors.build_equities`
+- Decomposes the S&P 500 and Nikkei 225 moves into **sector contributions**
+  (`contribution = sector weight × sector return`), so the bars approximately sum to the index
+  return. Sector proxies are liquid ETFs from Yahoo: the 11 **SPDR Select Sector** ETFs (US, GICS)
+  and the 17 **NEXT FUNDS TOPIX-17** ETFs (Japan; the N225 has no free sector decomposition, so
+  TOPIX-17 is the Japan sector backdrop). Index weights are a documented **static approximation**
+  (no clean free live feed), so the residual vs the actual index move is surfaced for honesty.
+- Sector ETF prices are cached **separately** (`data_cache/sector_panel.parquet`) and never enter
+  the canonical panel's `CANONICAL_COLUMNS`.
 
 ## Visualizations
 
@@ -101,3 +122,28 @@ visualizer.plot_weekly_heatmap(panel)
 
 The loader degrades gracefully: any single source that fails is skipped (with a warning) and its
 columns are emitted as `NaN`, so the pipeline always produces the canonical schema.
+
+## Web view (experimental)
+
+A browser dashboard that renders the same rates / FX / equities / cross-asset brief as the
+notebook. The pipeline is decoupled: Python writes a JSON snapshot, TypeScript displays it.
+
+```text
+macro_watch (Python)            web/ (TypeScript)
+  data_loader + analytics  →  web_export.py  →  web/public/data.json  →  Plot charts + tables
+  + sectors
+```
+
+```bash
+# 1. Generate the data snapshot (from the repo root):
+uv run python -m macro_watch.web_export            # uses the Parquet caches
+uv run python -m macro_watch.web_export --refresh  # re-fetch all sources first
+
+# 2. Run the dev server (from web/):
+cd web && npm install   # first time only
+npm run dev             # http://localhost:5173
+```
+
+The page shows a **static snapshot**: when the numbers change, re-run `web_export` and reload.
+`data.json` is git-ignored (regenerated from sources), so run step 1 once after a fresh clone.
+See [`web/README.md`](web/README.md) for the front-end layout and details.
