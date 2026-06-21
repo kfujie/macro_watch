@@ -219,6 +219,7 @@ def plot_curve_snapshot(panel: pd.DataFrame, market: str) -> Figure:
     lvl = panel[cols].dropna(how="all")
     snaps = _snapshot_dates(lvl.index)
     styles = {"Current": "-o", "1W ago": "--s", "1M ago": ":^"}
+    x = np.arange(len(tenors))  # evenly-spaced category positions, shared by both axes
 
     fig, (ax, axd) = plt.subplots(
         2, 1, figsize=(11, 7), height_ratios=[2.2, 1], sharex=True
@@ -227,7 +228,7 @@ def plot_curve_snapshot(panel: pd.DataFrame, market: str) -> Figure:
         if pd.isna(ts):
             continue
         ax.plot(
-            tenors,
+            x,
             lvl.loc[ts, cols].to_numpy(),
             styles[label],
             label=f"{label} ({ts.date()})",
@@ -240,11 +241,12 @@ def plot_curve_snapshot(panel: pd.DataFrame, market: str) -> Figure:
     if not pd.isna(prev):
         shift = (lvl.loc[cur, cols] - lvl.loc[prev, cols]).to_numpy() * 100.0
         colors = ["#c0392b" if v >= 0 else "#1f4e79" for v in shift]
-        axd.bar([str(t) for t in tenors], shift, color=colors, alpha=0.85)
+        axd.bar(x, shift, color=colors, alpha=0.85)
         axd.axhline(0, color="black", lw=0.8)
         axd.set_ylabel("WoW Δ (bp)")
     axd.set_xlabel("Tenor (Y)")
-    axd.set_xticks(range(len(tenors)), [str(t) for t in tenors])
+    axd.set_xticks(x)
+    axd.set_xticklabels([str(t) for t in tenors])
     fig.suptitle(
         f"{_MARKET_TITLE[market]} Curve Snapshot & Weekly Shift", fontweight="bold"
     )
@@ -379,6 +381,7 @@ def plot_curve_transition(
     """
     curve = CURVES[market]
     tenors, cols = list(curve), list(curve.values())
+    x = np.arange(len(tenors))  # evenly-spaced category positions
     weekly = curve_levels(panel, market).resample("W-FRI").last().dropna(how="all")
     weekly = weekly.tail(weeks)
     cmap = plt.get_cmap("viridis")
@@ -388,22 +391,26 @@ def plot_curve_transition(
     for color, (ts, row) in zip(shades, weekly.iterrows()):
         recent = ts == weekly.index[-1]
         ax.plot(
-            tenors, row[cols].to_numpy(), "-o" if recent else "-",
+            x, row[cols].to_numpy(), "-o" if recent else "-",
             color=color, lw=2.4 if recent else 1.3, alpha=1.0 if recent else 0.8,
             label=ts.date().isoformat(),
         )
     ax.set_title(f"{_MARKET_TITLE[market]} curve — last {len(weekly)} weekly closes")
     ax.set_xlabel("Tenor (Y)")
     ax.set_ylabel("Yield (%)")
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(t) for t in tenors])
     ax.legend(frameon=True, fontsize=7, ncol=2, title="week ending")
 
     wdiff = weekly[cols].diff().dropna(how="all") * 100.0
     for color, (ts, row) in zip(shades[1:], wdiff.iterrows()):
-        axd.plot(tenors, row.to_numpy(), "-o", color=color, lw=1.4, label=ts.date().isoformat())
+        axd.plot(x, row.to_numpy(), "-o", color=color, lw=1.4, label=ts.date().isoformat())
     axd.axhline(0, color="black", lw=0.8)
     axd.set_title("Week-on-week change by tenor (bp)")
     axd.set_xlabel("Tenor (Y)")
     axd.set_ylabel("Δ vs prior week (bp)")
+    axd.set_xticks(x)
+    axd.set_xticklabels([str(t) for t in tenors])
     axd.legend(frameon=True, fontsize=7, ncol=2, title="week ending")
 
     fig.suptitle(f"{_MARKET_TITLE[market]} Weekly Curve Transition", fontweight="bold")
