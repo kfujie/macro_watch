@@ -49,6 +49,8 @@ macro_watch/
   (`Z_1W`), level richness z-score (`Z_level`), and trailing-year percentile.
 - **Curve PCA** — level/slope/curvature decomposition (sign-normalized PC1/PC2/PC3) with
   3-factor **rich/cheap** residuals per tenor (+ cheap / − rich).
+- **Weekly transition** (`weekly_transition`) — week-ending (W-FRI) levels across the last N
+  weeks for tenors / slopes / flies, with the latest `WoW(bp)`.
 
 ## Visualizations
 
@@ -57,8 +59,10 @@ macro_watch/
 3. **Rolling correlations** — 30d/60d time series for the key macro pairs.
 4. **Curve snapshot & weekly shift** — full UST / JGB curve (current vs 1W / 1M) + per-tenor WoW bars.
 5. **Curve momentum/richness heatmap** — slope & fly `Z_1W` and `Z_level` for both markets.
-6. **Butterflies** — fly time series with ±1σ/±2σ bands and current z.
+6. **Slopes & butterflies** — *actual spread* (bp) time series with mean and ±1σ/±2σ bands.
 7. **Curve PCA** — loadings, factor history, and rich/cheap residual bars.
+8. **Weekly curve transition** — full curve overlaid at the last N weekly closes (oldest→newest)
+   plus the week-on-week change by tenor.
 
 ## Setup (uv)
 

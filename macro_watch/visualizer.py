@@ -15,6 +15,7 @@ from macro_watch.analytics import (
     CURVES,
     PCAResult,
     augment,
+    curve_levels,
     curve_metrics,
     curve_pca,
     rates_snapshot,
@@ -218,11 +219,18 @@ def plot_curve_snapshot(panel: pd.DataFrame, market: str) -> Figure:
     snaps = _snapshot_dates(lvl.index)
     styles = {"Current": "-o", "1W ago": "--s", "1M ago": ":^"}
 
-    fig, (ax, axd) = plt.subplots(2, 1, figsize=(11, 7), height_ratios=[2.2, 1], sharex=True)
+    fig, (ax, axd) = plt.subplots(
+        2, 1, figsize=(11, 7), height_ratios=[2.2, 1], sharex=True
+    )
     for label, ts in snaps.items():
         if pd.isna(ts):
             continue
-        ax.plot(tenors, lvl.loc[ts, cols].to_numpy(), styles[label], label=f"{label} ({ts.date()})")
+        ax.plot(
+            tenors,
+            lvl.loc[ts, cols].to_numpy(),
+            styles[label],
+            label=f"{label} ({ts.date()})",
+        )
     ax.set_title(f"{_MARKET_TITLE[market]} Curve")
     ax.set_ylabel("Yield (%)")
     ax.legend(frameon=True, fontsize=9)
@@ -236,7 +244,9 @@ def plot_curve_snapshot(panel: pd.DataFrame, market: str) -> Figure:
         axd.set_ylabel("WoW Δ (bp)")
     axd.set_xlabel("Tenor (Y)")
     axd.set_xticks(range(len(tenors)), [str(t) for t in tenors])
-    fig.suptitle(f"{_MARKET_TITLE[market]} Curve Snapshot & Weekly Shift", fontweight="bold")
+    fig.suptitle(
+        f"{_MARKET_TITLE[market]} Curve Snapshot & Weekly Shift", fontweight="bold"
+    )
     fig.tight_layout()
     return fig
 
@@ -247,8 +257,16 @@ def plot_rates_heatmap(panel: pd.DataFrame) -> Figure:
     for ax, market in zip(axes, ("US", "JP")):
         snap = rates_snapshot(panel, market)[["Z_1W", "Z_level"]]
         sns.heatmap(
-            snap, annot=True, fmt="+.2f", cmap="RdBu_r", center=0.0, vmin=-3, vmax=3,
-            linewidths=0.5, cbar=False, ax=ax,
+            snap,
+            annot=True,
+            fmt="+.2f",
+            cmap="RdBu_r",
+            center=0.0,
+            vmin=-3,
+            vmax=3,
+            linewidths=0.5,
+            cbar=False,
+            ax=ax,
         )
         ax.set_title(f"{_MARKET_TITLE[market]} slopes & flies")
         ax.set_ylabel("")
@@ -257,27 +275,55 @@ def plot_rates_heatmap(panel: pd.DataFrame) -> Figure:
     return fig
 
 
+def _plot_metric_panels(
+    panel: pd.DataFrame,
+    market: str,
+    names: tuple[str, ...],
+    suptitle: str,
+    *,
+    lookback: int,
+    color: str,
+) -> Figure:
+    """Stacked time-series panels of the *actual* spread (bp) with ±1σ/±2σ bands."""
+    metrics = curve_metrics(panel, market).tail(lookback)
+    fig, axes = plt.subplots(len(names), 1, figsize=(11, 2.6 * len(names)), sharex=True)
+    axes = np.atleast_1d(axes)
+    for ax, name in zip(axes, names):
+        s = metrics[name].dropna()
+        mu, sd = s.mean(), s.std(ddof=0)
+        ax.plot(s.index, s.to_numpy(), color=color, lw=1.3)            # actual spread (bp)
+        ax.axhline(mu, color="black", lw=0.8, ls="--", alpha=0.7)
+        for k, a in ((1, 0.18), (2, 0.10)):
+            ax.fill_between(s.index, mu - k * sd, mu + k * sd, color=color, alpha=a)
+        last = s.iloc[-1]
+        z = (last - mu) / sd if sd else 0.0
+        ax.set_title(f"{name}   last={last:+.1f} bp   z={z:+.2f}", fontsize=10)
+        ax.set_ylabel("bp")
+    fig.suptitle(suptitle, fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def plot_spreads(
+    panel: pd.DataFrame, market: str, spreads: tuple[str, ...], *, lookback: int = 504
+) -> Figure:
+    """Actual slope-spread (bp) time series with mean and ±1σ/±2σ bands."""
+    return _plot_metric_panels(
+        panel, market, spreads,
+        f"{_MARKET_TITLE[market]} Slopes — actual spread (bp), steeper = up",
+        lookback=lookback, color="#1f4e79",
+    )
+
+
 def plot_butterflies(
     panel: pd.DataFrame, market: str, flies: tuple[str, ...], *, lookback: int = 504
 ) -> Figure:
-    """Butterfly time series with mean and ±1σ/±2σ bands over the window."""
-    metrics = curve_metrics(panel, market).tail(lookback)
-    n = len(flies)
-    fig, axes = plt.subplots(n, 1, figsize=(11, 2.6 * n), sharex=True)
-    axes = np.atleast_1d(axes)
-    for ax, fly in zip(axes, flies):
-        s = metrics[fly].dropna()
-        mu, sd = s.mean(), s.std(ddof=0)
-        ax.plot(s.index, s.to_numpy(), color="#1f4e79", lw=1.3)
-        ax.axhline(mu, color="black", lw=0.8, ls="--", alpha=0.7)
-        for k, a in ((1, 0.18), (2, 0.10)):
-            ax.fill_between(s.index, mu - k * sd, mu + k * sd, color="#1f4e79", alpha=a)
-        last, z = s.iloc[-1], (s.iloc[-1] - mu) / sd if sd else 0.0
-        ax.set_title(f"{fly}  last={last:+.1f}bp  z={z:+.2f}", fontsize=10)
-        ax.set_ylabel("bp")
-    fig.suptitle(f"{_MARKET_TITLE[market]} Butterflies (belly cheap = up)", fontweight="bold")
-    fig.tight_layout()
-    return fig
+    """Actual butterfly-spread (bp) time series with mean and ±1σ/±2σ bands."""
+    return _plot_metric_panels(
+        panel, market, flies,
+        f"{_MARKET_TITLE[market]} Butterflies — actual spread (bp), belly cheap = up",
+        lookback=lookback, color="#7030a0",
+    )
 
 
 def plot_curve_pca(panel: pd.DataFrame, market: str, *, lookback: int = 252) -> Figure:
@@ -290,8 +336,12 @@ def plot_curve_pca(panel: pd.DataFrame, market: str, *, lookback: int = 252) -> 
     ax_sc = fig.add_subplot(gs[1, :])
 
     for pc in pca.loadings.columns:
-        ax_load.plot(tenors, pca.loadings[pc].to_numpy(), "-o",
-                     label=f"{pc} ({pca.explained[pc]:.0%})")
+        ax_load.plot(
+            tenors,
+            pca.loadings[pc].to_numpy(),
+            "-o",
+            label=f"{pc} ({pca.explained[pc]:.0%})",
+        )
     ax_load.axhline(0, color="black", lw=0.6)
     ax_load.set_title("Loadings (PC1≈level, PC2≈slope, PC3≈curvature)")
     ax_load.set_xlabel("Tenor (Y)")
@@ -310,6 +360,51 @@ def plot_curve_pca(panel: pd.DataFrame, market: str, *, lookback: int = 252) -> 
     ax_sc.set_title("PCA factor history")
     ax_sc.legend(fontsize=8, ncol=3)
 
-    fig.suptitle(f"{_MARKET_TITLE[market]} Curve PCA — as of {pca.as_of.date()}", fontweight="bold")
+    fig.suptitle(
+        f"{_MARKET_TITLE[market]} Curve PCA — as of {pca.as_of.date()}",
+        fontweight="bold",
+    )
+    fig.tight_layout()
+    return fig
+
+
+def plot_curve_transition(
+    panel: pd.DataFrame, market: str, *, weeks: int = 8
+) -> Figure:
+    """Weekly transition: the full curve at each of the last N Friday closes.
+
+    Curves are colored oldest→newest so the week-by-week shift is visible; the
+    right panel shows each week's change vs the prior week (bp) per tenor.
+    """
+    curve = CURVES[market]
+    tenors, cols = list(curve), list(curve.values())
+    weekly = curve_levels(panel, market).resample("W-FRI").last().dropna(how="all")
+    weekly = weekly.tail(weeks)
+    cmap = plt.get_cmap("viridis")
+    shades = [cmap(i / max(1, len(weekly) - 1)) for i in range(len(weekly))]
+
+    fig, (ax, axd) = plt.subplots(1, 2, figsize=(13, 5))
+    for color, (ts, row) in zip(shades, weekly.iterrows()):
+        recent = ts == weekly.index[-1]
+        ax.plot(
+            tenors, row[cols].to_numpy(), "-o" if recent else "-",
+            color=color, lw=2.4 if recent else 1.3, alpha=1.0 if recent else 0.8,
+            label=ts.date().isoformat(),
+        )
+    ax.set_title(f"{_MARKET_TITLE[market]} curve — last {len(weekly)} weekly closes")
+    ax.set_xlabel("Tenor (Y)")
+    ax.set_ylabel("Yield (%)")
+    ax.legend(frameon=True, fontsize=7, ncol=2, title="week ending")
+
+    wdiff = weekly[cols].diff().dropna(how="all") * 100.0
+    for color, (ts, row) in zip(shades[1:], wdiff.iterrows()):
+        axd.plot(tenors, row.to_numpy(), "-o", color=color, lw=1.4, label=ts.date().isoformat())
+    axd.axhline(0, color="black", lw=0.8)
+    axd.set_title("Week-on-week change by tenor (bp)")
+    axd.set_xlabel("Tenor (Y)")
+    axd.set_ylabel("Δ vs prior week (bp)")
+    axd.legend(frameon=True, fontsize=7, ncol=2, title="week ending")
+
+    fig.suptitle(f"{_MARKET_TITLE[market]} Weekly Curve Transition", fontweight="bold")
     fig.tight_layout()
     return fig

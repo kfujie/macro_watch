@@ -60,16 +60,33 @@ CURVES: Final[Mapping[str, dict[int, str]]] = {"US": US_CURVE, "JP": JP_CURVE}
 
 # Slope (short, long) and butterfly (short, belly, long) structures, in years.
 US_SLOPES: Final[tuple[tuple[int, int], ...]] = (
-    (2, 5), (2, 10), (5, 10), (5, 30), (10, 30), (2, 30),
+    (2, 5),
+    (2, 10),
+    (5, 10),
+    (5, 30),
+    (10, 30),
+    (2, 30),
 )
 US_FLIES: Final[tuple[tuple[int, int, int], ...]] = (
-    (2, 5, 10), (5, 7, 10), (5, 10, 30), (10, 20, 30),
+    (2, 5, 10),
+    (5, 7, 10),
+    (5, 10, 30),
+    (10, 20, 30),
 )
 JP_SLOPES: Final[tuple[tuple[int, int], ...]] = (
-    (2, 10), (5, 10), (10, 20), (10, 30), (20, 30), (2, 30), (5, 30),
+    (2, 10),
+    (5, 10),
+    (10, 20),
+    (10, 30),
+    (20, 30),
+    (2, 30),
+    (5, 30),
 )
 JP_FLIES: Final[tuple[tuple[int, int, int], ...]] = (
-    (2, 5, 10), (5, 10, 20), (10, 20, 30), (20, 30, 40),
+    (2, 5, 10),
+    (5, 10, 20),
+    (10, 20, 30),
+    (20, 30, 40),
 )
 CURVE_STRUCTURES: Final[
     Mapping[str, tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int, int], ...]]]
@@ -281,10 +298,10 @@ class PCAResult:
 
     as_of: pd.Timestamp
     market: str
-    scores: pd.DataFrame          # PC time series (PC1..PCn)
-    loadings: pd.DataFrame        # tenor x PC
-    explained: pd.Series          # explained-variance ratio per PC
-    rich_cheap: pd.Series         # latest 3-factor residual per tenor (bps, + = cheap)
+    scores: pd.DataFrame  # PC time series (PC1..PCn)
+    loadings: pd.DataFrame  # tenor x PC
+    explained: pd.Series  # explained-variance ratio per PC
+    rich_cheap: pd.Series  # latest 3-factor residual per tenor (bps, + = cheap)
 
 
 def _orient_loadings(load: np.ndarray) -> np.ndarray:
@@ -318,13 +335,15 @@ def curve_pca(
     if lookback:
         X = X.tail(lookback)
     if len(X) < n_components + 1:
-        raise ValueError(f"Insufficient history for {market} curve PCA ({len(X)} rows).")
+        raise ValueError(
+            f"Insufficient history for {market} curve PCA ({len(X)} rows)."
+        )
 
     mean = X.mean()
     Xc = X.to_numpy() - mean.to_numpy()
     _, sv, vt = np.linalg.svd(Xc, full_matrices=False)
-    load = _orient_loadings(vt[:n_components])          # (n, tenors)
-    scores = Xc @ load.T                                # (T, n)
+    load = _orient_loadings(vt[:n_components])  # (n, tenors)
+    scores = Xc @ load.T  # (T, n)
     evr = (sv**2 / np.sum(sv**2))[:n_components]
     fit = scores @ load + mean.to_numpy()
     resid_bps = (X.to_numpy()[-1] - fit[-1]) * BP
@@ -338,6 +357,47 @@ def curve_pca(
         explained=pd.Series(evr, index=names, name="explained_var"),
         rich_cheap=pd.Series(resid_bps, index=cols, name="rich_cheap_bp"),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Weekly transition (week-ending levels across the last N weeks)
+# --------------------------------------------------------------------------- #
+def weekly_curve(panel: pd.DataFrame, market: str) -> pd.DataFrame:
+    """Curve metrics sampled at the weekly close (W-FRI): tenors %, slopes/flies bp."""
+    return curve_metrics(panel, market).resample("W-FRI").last()
+
+
+def weekly_transition(
+    panel: pd.DataFrame, market: str, *, weeks: int = 8, kind: str = "all"
+) -> pd.DataFrame:
+    """Week-ending levels across the last ``weeks`` weeks (a transition table).
+
+    Rows are tenors (``%``), slopes and butterflies (``bp``); columns are the last
+    ``weeks`` Friday closes plus the latest week-over-week change in bp (``WoW(bp)``).
+    ``kind`` filters rows: ``"tenor"``, ``"slope"``, ``"fly"`` or ``"all"``.
+    """
+    lvl = curve_levels(panel, market).resample("W-FRI").last()
+    met = curve_metrics(panel, market).resample("W-FRI").last()
+    units = {**{c: "%" for c in lvl.columns}, **{c: "bp" for c in met.columns}}
+    combined = pd.concat([lvl, met], axis=1).dropna(how="all").tail(weeks)
+
+    out = combined.T
+    out.columns = [c.date() for c in out.columns]
+    out.insert(0, "Unit", [units[m] for m in out.index])
+    if combined.shape[0] >= 2:
+        last, prev = out.columns[-1], out.columns[-2]
+        delta = out[last] - out[prev]
+        # express every weekly change in bp (tenors are in %, so scale by 100).
+        out["WoW(bp)"] = [
+            d * (BP if units[m] == "%" else 1.0) for m, d in delta.items()
+        ]
+
+    if kind == "tenor":
+        out = out.loc[out["Unit"] == "%"]
+    elif kind in ("slope", "fly"):
+        want = 3 if kind == "fly" else 2
+        out = out.loc[[m for m in out.index if str(m).count("s") == want]]
+    return out.round(3)
 
 
 # --------------------------------------------------------------------------- #
