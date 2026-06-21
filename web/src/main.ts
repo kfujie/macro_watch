@@ -77,6 +77,28 @@ function structureCard(
   ]);
 }
 
+/** A Full-history / Past-month button pair; calls `onChange` when the window flips. */
+function windowToggle(onChange: (w: Window) => void): HTMLElement {
+  let current: Window = "all";
+  const buttons: HTMLElement[] = [];
+  const mk = (label: string, w: Window): HTMLElement => {
+    const b = el("button", { class: "toggle" + (w === current ? " on" : "") }, [label]);
+    b.addEventListener("click", () => {
+      if (w === current) return;
+      current = w;
+      buttons.forEach((x) => x.classList.remove("on"));
+      b.classList.add("on");
+      onChange(w);
+    });
+    buttons.push(b);
+    return b;
+  };
+  return el("div", { class: "toggles" }, [
+    mk("Full history", "all"),
+    mk("Past month", "1m"),
+  ]);
+}
+
 /** A grid of structure panels with a shared Full-history / Past-month toggle. */
 function structureGroup(
   series: { name: string; points: SeriesPoint[] }[],
@@ -87,24 +109,10 @@ function structureGroup(
   const paint = (): void => {
     grid.replaceChildren(...series.map((s) => structureCard(s, window, color)));
   };
-
-  const buttons: HTMLElement[] = [];
-  const mkBtn = (label: string, w: Window): HTMLElement => {
-    const b = el("button", { class: "toggle" + (w === window ? " on" : "") }, [label]);
-    b.addEventListener("click", () => {
-      window = w;
-      buttons.forEach((x) => x.classList.remove("on"));
-      b.classList.add("on");
-      paint();
-    });
-    buttons.push(b);
-    return b;
-  };
-
-  const toggles = el("div", { class: "toggles" }, [
-    mkBtn("Full history", "all"),
-    mkBtn("Past month", "1m"),
-  ]);
+  const toggles = windowToggle((w) => {
+    window = w;
+    paint();
+  });
   paint();
   return el("div", {}, [toggles, grid]);
 }
@@ -167,24 +175,43 @@ const MARKET_VOL_COLOR: Record<string, string> = {
 
 function ratesVolatilitySection(data: MacroData): HTMLElement {
   const rv = data.rates_volatility;
-  const series = rv.series
+  const lines = rv.series
     .filter((s) => s.points.length > 0)
     .map((s) => ({
       label: MARKET_TITLE[s.market] ?? s.market,
       color: MARKET_VOL_COLOR[s.market] ?? "#8b98a8",
       points: s.points,
     }));
-  const body = series.length
-    ? figure([ratesVolatility(series)])
-    : el("p", { class: "note" }, ["No volatility data this window."]);
+
+  let window: Window = "all";
+  const chartHost = figure([]);
+  const paint = (): void => {
+    // Narrowing the points rescales the bp axis (no fixed y-domain) for free.
+    const series = lines.map((s) => ({
+      ...s,
+      points: window === "1m" ? lastMonth(s.points) : s.points,
+    }));
+    chartHost.replaceChildren(
+      series.length
+        ? ratesVolatility(series)
+        : el("p", { class: "note" }, ["No volatility data this window."]),
+    );
+  };
+  const toggles = windowToggle((w) => {
+    window = w;
+    paint();
+  });
+  paint();
+
   return el("section", {}, [
     el("h2", { class: "section" }, ["Rates — weekly yield volatility"]),
     el("p", { class: "note" }, [
       `Realized volatility of the ${rv.tenor}Y benchmark yield: rolling ${rv.window_days}-session ` +
         `stdev of daily changes, scaled to a ${rv.horizon_days}-session (weekly) move, in bp. ` +
-        `Higher = a more turbulent rates market.`,
+        `Toggle full history or the past month — the bp axis rescales.`,
     ]),
-    body,
+    toggles,
+    chartHost,
   ]);
 }
 
