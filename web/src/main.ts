@@ -2,6 +2,8 @@ import "./styles.css";
 import type { Horizon, IndexAttribution, MacroData, Market } from "./types";
 import { card, el, table } from "./ui";
 import {
+  bflyStats,
+  butterflyPanel,
   curveSnapshot,
   pcaCharts,
   sectorContribution,
@@ -18,10 +20,31 @@ function figure(nodes: (HTMLElement | SVGSVGElement)[]): HTMLElement {
   return el("figure", {}, nodes);
 }
 
+function butterflyCard(serie: { name: string; points: Market["butterflies"]["series"][number]["points"] }): HTMLElement {
+  const stats = bflyStats(serie.points);
+  const titleBits: (Node | string)[] = [el("b", {}, [serie.name])];
+  if (stats) {
+    titleBits.push(
+      el("span", { class: "bfly-meta" }, [
+        ` last ${signed(stats.last, 1)} bp · z `,
+        el("span", { class: stats.z >= 0 ? "pos" : "neg" }, [signed(stats.z)]),
+      ]),
+    );
+  }
+  const body = stats
+    ? figure([butterflyPanel(serie.points, stats)])
+    : el("p", { class: "note" }, ["No data."]);
+  return el("div", { class: "card" }, [
+    el("div", { class: "card-title" }, titleBits),
+    body,
+  ]);
+}
+
 function marketSection(name: string, m: Market): HTMLElement {
   const title = MARKET_TITLE[name] ?? name;
   const ev = m.pca.explained;
   const pctVar = (k: string) => ((ev[k] ?? 0) * 100).toFixed(1);
+  const years = (m.butterflies.lookback / 252).toFixed(1);
 
   return el("section", {}, [
     el("h2", { class: "section" }, [`${title} — curve, slopes & butterflies`]),
@@ -33,6 +56,16 @@ function marketSection(name: string, m: Market): HTMLElement {
       card("Outright tenors", table(m.tenor_table)),
       card("Slopes & butterflies (bp)", table(m.rates_table)),
     ]),
+
+    el("h3", { class: "sub" }, [`Butterflies — spread (bp), belly cheap = up`]),
+    el("p", { class: "note" }, [
+      `Tenor-weighted fly spread over ~${years}y, with mean and ±1σ/±2σ bands.`,
+    ]),
+    el(
+      "div",
+      { class: "grid-2" },
+      m.butterflies.series.map(butterflyCard),
+    ),
 
     el("h3", { class: "sub" }, ["Curve PCA — level / slope / curvature"]),
     el("div", { class: "stat-row" }, [

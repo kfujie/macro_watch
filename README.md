@@ -4,8 +4,9 @@ A toolkit for **weekly cross-asset macro market analysis**. It ingests, aligns, 
 visualizes macro-financial data so you can read the week's rates, equity, and commodity regimes
 at a glance — with a focus on the US Treasury and JGB curves.
 
-Two front-ends consume the same Python analytics: the original Jupyter notebook, and an
-experimental browser dashboard (Vite + TypeScript) — see [Web view](#web-view-experimental).
+The **primary display is a browser dashboard** (Vite + TypeScript + Observable Plot) — see
+[Web view](#web-view). Python owns all ingestion and analytics and writes a JSON snapshot that the
+front-end renders; the original Jupyter notebook is kept as a secondary/legacy view.
 
 ## Package layout
 
@@ -101,32 +102,16 @@ computation — `web_export.py` writes one `data.json` that the TypeScript app r
 11. **FX — dollar & yen** — USD/JPY & DXY overview, USD/JPY vs the US−JP differential (dual-axis),
     and the rate-differential fair-value scatter + residual.
 
-## Setup (uv)
+## Setup
 
 ```bash
-uv sync                          # install dependencies into .venv
-uv run jupyter lab macro_watch/weekly_report.ipynb
+uv sync   # install Python dependencies into .venv
 ```
 
-Programmatic use:
+### Web view
 
-```python
-from macro_watch.data_loader import MacroDataLoader
-from macro_watch import analytics, visualizer
-
-panel = MacroDataLoader().load(refresh=True)   # fetch + cache (Parquet)
-summary = analytics.weekly_summary(panel)      # levels / WoW / z-scores
-visualizer.apply_style()
-visualizer.plot_weekly_heatmap(panel)
-```
-
-The loader degrades gracefully: any single source that fails is skipped (with a warning) and its
-columns are emitted as `NaN`, so the pipeline always produces the canonical schema.
-
-## Web view (experimental)
-
-A browser dashboard that renders the same rates / FX / equities / cross-asset brief as the
-notebook. The pipeline is decoupled: Python writes a JSON snapshot, TypeScript displays it.
+The primary display. The pipeline is decoupled: Python writes a JSON snapshot, TypeScript renders
+it — the front-end does no computation.
 
 ```text
 macro_watch (Python)            web/ (TypeScript)
@@ -146,4 +131,27 @@ npm run dev             # http://localhost:5173
 
 The page shows a **static snapshot**: when the numbers change, re-run `web_export` and reload.
 `data.json` is git-ignored (regenerated from sources), so run step 1 once after a fresh clone.
-See [`web/README.md`](web/README.md) for the front-end layout and details.
+It renders rates (curve, slopes, **butterflies**, PCA), FX, equity **sector attribution**
+(S&P 500 / Nikkei 225), and the cross-asset z-score row. See [`web/README.md`](web/README.md) for
+the front-end layout.
+
+### Notebook (legacy)
+
+```bash
+uv run jupyter lab macro_watch/weekly_report.ipynb
+```
+
+Programmatic use:
+
+```python
+from macro_watch.data_loader import MacroDataLoader
+from macro_watch import analytics, visualizer
+
+panel = MacroDataLoader().load(refresh=True)   # fetch + cache (Parquet)
+summary = analytics.weekly_summary(panel)      # levels / WoW / z-scores
+visualizer.apply_style()
+visualizer.plot_weekly_heatmap(panel)
+```
+
+The loader degrades gracefully: any single source that fails is skipped (with a warning) and its
+columns are emitted as `NaN`, so the pipeline always produces the canonical schema.

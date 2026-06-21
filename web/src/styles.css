@@ -90,6 +90,20 @@ h3.sub {
   font-size: 13px;
 }
 
+.bfly-meta {
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bfly-meta .pos {
+  color: var(--pos);
+}
+
+.bfly-meta .neg {
+  color: var(--neg);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

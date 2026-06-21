@@ -39,7 +39,8 @@ macro_watch (Python)            web/ (TypeScript)
 
 ## Sections
 
-- **Rates** (§2): US & JGB curve snapshot, slopes/flies, PCA.
+- **Rates** (§2): US & JGB curve snapshot, slopes/flies tables, **butterfly** spread panels
+  (tenor-weighted bp with mean and ±1σ/±2σ bands, belly cheap = up), and curve PCA.
 - **FX** (§3): USD/JPY vs the US–JP 10Y differential.
 - **Equities**: S&P 500 & Nikkei 225 — each index move decomposed into sector
   contributions (`weight × sector return`), with a WoW/1M toggle. Sector proxies

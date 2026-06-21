@@ -1,6 +1,8 @@
 import * as Plot from "@observablehq/plot";
 import type { Curve, Horizon, IndexAttribution, Pca, SeriesPoint } from "./types";
 
+const PURPLE = "#a78bfa";
+
 const POS = "#e06c5a";
 const NEG = "#4a90d9";
 const INK = "#e6edf3";
@@ -157,6 +159,63 @@ export function usdjpyVsDifferential(
         strokeWidth: 1.4,
         strokeDasharray: "4 3",
       }),
+    ],
+  });
+}
+
+export interface BflyStats {
+  mu: number;
+  sd: number;
+  last: number;
+  z: number;
+  n: number;
+}
+
+/** Mean / population-σ / latest level & z over a fly's spread series. */
+export function bflyStats(points: SeriesPoint[]): BflyStats | null {
+  const v = points
+    .map((p) => p.value)
+    .filter((x): x is number => x !== null);
+  if (v.length === 0) return null;
+  const mu = v.reduce((a, b) => a + b, 0) / v.length;
+  const sd = Math.sqrt(v.reduce((a, b) => a + (b - mu) ** 2, 0) / v.length);
+  const last = v[v.length - 1]!;
+  return { mu, sd, last, z: sd ? (last - mu) / sd : 0, n: v.length };
+}
+
+/** One butterfly panel: spread (bp) line with mean + ±1σ/±2σ bands. */
+export function butterflyPanel(
+  points: SeriesPoint[],
+  stats: BflyStats,
+): HTMLElement | SVGSVGElement {
+  const line = points
+    .filter((p) => p.value !== null)
+    .map((p) => ({ date: new Date(p.date), value: p.value as number }));
+  const x1 = line[0]!.date;
+  const x2 = line[line.length - 1]!.date;
+  const { mu, sd } = stats;
+  const band = (k: number, opacity: number) =>
+    Plot.rect([{}], {
+      x1,
+      x2,
+      y1: mu - k * sd,
+      y2: mu + k * sd,
+      fill: PURPLE,
+      fillOpacity: opacity,
+    });
+
+  return Plot.plot({
+    style: baseStyle,
+    height: 150,
+    marginLeft: 40,
+    marginRight: 12,
+    x: { label: null, grid: true, ...gridColor },
+    y: { label: "bp", grid: true, ...gridColor },
+    marks: [
+      band(2, 0.1),
+      band(1, 0.18),
+      Plot.ruleY([mu], { stroke: INK, strokeDasharray: "3 3", strokeOpacity: 0.6 }),
+      Plot.line(line, { x: "date", y: "value", stroke: PURPLE, strokeWidth: 1.4 }),
     ],
   });
 }

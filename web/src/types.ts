@@ -21,16 +21,27 @@ export interface Pca {
   rich_cheap: { tenor: string; bp: number | null }[];
 }
 
+export interface SeriesPoint {
+  date: string;
+  value: number | null;
+}
+
+export interface ButterflySeries {
+  name: string;
+  points: SeriesPoint[];
+}
+
+export interface Butterflies {
+  lookback: number;
+  series: ButterflySeries[];
+}
+
 export interface Market {
   curve: Curve;
   tenor_table: Row[];
   rates_table: Row[];
+  butterflies: Butterflies;
   pca: Pca;
-}
-
-export interface SeriesPoint {
-  date: string;
-  value: number | null;
 }
 
 export interface Fx {

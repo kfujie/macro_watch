@@ -109,6 +109,24 @@ def _pca(panel: pd.DataFrame, market: str) -> dict[str, Any]:
     }
 
 
+def _butterflies(panel: pd.DataFrame, market: str) -> dict[str, Any]:
+    """Each fly's tenor-weighted spread (bp) over the lookback, for the band panels.
+
+    Mean / ±σ bands and the latest z are computed client-side over exactly these
+    points, matching ``visualizer.plot_butterflies`` (belly cheap = positive).
+    """
+    metrics = analytics.curve_metrics(panel, market).tail(SERIES_TAIL)
+    flies = [c for c in metrics.columns if str(c).count("s") == 3]
+    series = [
+        {
+            "name": c.replace(f"{market}_", ""),
+            "points": _series(metrics[c]),
+        }
+        for c in flies
+    ]
+    return {"lookback": SERIES_TAIL, "series": series}
+
+
 def _market(panel: pd.DataFrame, market: str) -> dict[str, Any]:
     return {
         "curve": _curve_snapshot(panel, market),
@@ -118,6 +136,7 @@ def _market(panel: pd.DataFrame, market: str) -> dict[str, Any]:
         "rates_table": _records(
             analytics.rates_snapshot(panel, market), index_name="metric"
         ),
+        "butterflies": _butterflies(panel, market),
         "pca": _pca(panel, market),
     }
 

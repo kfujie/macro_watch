@@ -3,10 +3,21 @@
 Weekly cross-asset macro toolkit. **US Treasury & JGB curve analysis is the primary focus**;
 cross-asset (equity/commodity) is supporting context.
 
+**The web dashboard (`web/`) is now the primary display**; Python owns all compute and the
+notebook is the secondary/legacy view. Python writes one `web/public/data.json` (via
+`web_export.py`); the Vite + TypeScript + Observable Plot app renders it — the front-end does **no**
+computation. Keep the two in sync: a new analytic = a field in `web_export.py` + a type in
+`web/src/types.ts` + a chart/table in `web/src/`.
+
 ## Environment & commands
 - **uv-managed**, Python 3.13. Run everything via `uv run` (e.g. `uv run python -c ...`).
 - Smoke test: `uv run python -c "from macro_watch.data_loader import MacroDataLoader; MacroDataLoader().load()"`
-- Execute the notebook headless:
+- **Web (primary)**: `uv run python -m macro_watch.web_export [--refresh]` writes `web/public/data.json`;
+  then `cd web && npm install && npm run dev` (http://localhost:5173). Static snapshot — re-run the
+  export and reload when the data changes. `npm run build` runs `tsc --noEmit` (type-check only;
+  **don't** drop `noEmit` — a bare `tsc` emits `src/*.js` that Vite resolves *before* the `.ts`
+  sources and silently shadows them) then `vite build`.
+- Execute the notebook headless (legacy):
   `cd macro_watch && uv run jupyter nbconvert --to notebook --execute --inplace weekly_report.ipynb --ExecutePreprocessor.timeout=300`
 - Package imports as `macro_watch.*` from the repo root (the notebook adds the parent to `sys.path`).
 - Private GitHub repo: `kfujie/macro_watch`. Commit only when asked.
@@ -15,10 +26,18 @@ cross-asset (equity/commodity) is supporting context.
 - `data_loader.py` — ingest (MoF/FRED/Yahoo), business-day align + ffill, Parquet cache.
 - `analytics.py` — curves, real yield, momentum z-scores, rolling corr, **rates: curve_metrics /
   rates_snapshot / tenor_snapshot / curve_pca / weekly_transition / daily_transition**.
-- `visualizer.py` — all plots (`plot_curve_snapshot`, `plot_curve_pca`, `plot_spreads`,
-  `plot_butterflies`, `plot_spread_transition`, `plot_spread_daily`, `plot_curve_transition`, …).
-- `weekly_report.ipynb` — §1 ingest, **§2 US Treasury & JGB (main)**, §3 cross-asset backdrop,
-  §4 markdown brief (leads with rates). `REFRESH=False` uses the cache.
+- `sectors.py` — S&P 500 / Nikkei 225 sector attribution (SPDR + TOPIX-17 ETF proxies), cached to
+  `data_cache/sector_panel.parquet` **separately** from the canonical panel (28 tickers stay out of
+  `CANONICAL_COLUMNS`). Index weights are a documented static approximation.
+- `visualizer.py` — matplotlib plots for the notebook (`plot_curve_snapshot`, `plot_curve_pca`,
+  `plot_spreads`, `plot_butterflies`, `plot_spread_transition`, `plot_spread_daily`, …).
+- `web_export.py` — serialize panel + analytics + sectors to `web/public/data.json` (NaN→null,
+  dates→ISO; series tail-trimmed to `SERIES_TAIL=504`).
+- `web/` — **primary display**. `src/charts.ts` (Observable Plot: curve, butterflies, PCA, FX
+  fair value, sector contribution, z-scores), `src/ui.ts`, `src/main.ts`, `src/types.ts`.
+  `public/data.json` is git-ignored (regenerated from sources).
+- `weekly_report.ipynb` (legacy) — §1 ingest, **§2 US Treasury & JGB (main)**, §3 cross-asset
+  backdrop, §4 markdown brief (leads with rates). `REFRESH=False` uses the cache.
 
 ## Data-source quirks (these took digging — don't relitigate)
 - **MoF JGB**: Shift-JIS CSV, **Japanese-era dates** (`R8.6.1` = Reiwa→2026; offsets in `_ERA_OFFSET`).
