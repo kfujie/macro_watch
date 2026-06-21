@@ -79,3 +79,34 @@ export function card(title: string, body: Node): HTMLElement {
     body as Node,
   ]);
 }
+
+// --- Lightbox: tap a figure to enlarge it -----------------------------------
+let lightboxEl: HTMLElement | null = null;
+
+function ensureLightbox(): HTMLElement {
+  if (lightboxEl) return lightboxEl;
+  const inner = el("div", { class: "lightbox-inner" });
+  const overlay = el(
+    "div",
+    { class: "lightbox", role: "dialog", "aria-modal": "true" },
+    [inner, el("div", { class: "lightbox-hint" }, ["tap anywhere to close"])],
+  );
+  overlay.addEventListener("click", closeLightbox);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeLightbox();
+  });
+  document.body.append(overlay);
+  lightboxEl = overlay;
+  return overlay;
+}
+
+export function closeLightbox(): void {
+  lightboxEl?.classList.remove("open");
+}
+
+/** Show a (cloned) node enlarged in a full-screen overlay. */
+export function openLightbox(content: Node): void {
+  const overlay = ensureLightbox();
+  (overlay.firstElementChild as HTMLElement).replaceChildren(content);
+  overlay.classList.add("open");
+}

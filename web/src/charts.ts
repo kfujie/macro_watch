@@ -71,6 +71,16 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
     marks: [
       Plot.line(points, { x: "x", y: "yield", stroke: "label", strokeWidth: 1.8 }),
       Plot.dot(points, { x: "x", y: "yield", fill: "label", r: 3 }),
+      // Touch/hover the curve to read the nearest point's tenor & yield.
+      Plot.tip(
+        points,
+        Plot.pointer({
+          x: "x",
+          y: "yield",
+          title: (d: { tenor: string; label: string; yield: number | null }) =>
+            `${d.tenor} · ${d.label}\n${d.yield == null ? "n/a" : d.yield.toFixed(2) + "%"}`,
+        }),
+      ),
     ],
   });
 

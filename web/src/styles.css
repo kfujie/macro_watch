@@ -161,6 +161,63 @@ figure svg {
   height: auto;
 }
 
+figure.zoomable {
+  cursor: zoom-in;
+}
+
+/* Lightbox: tap a figure to enlarge it. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+  cursor: zoom-out;
+}
+
+.lightbox.open {
+  display: flex;
+}
+
+.lightbox-inner {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  width: min(1100px, 92vw);
+  max-width: 92vw;
+  max-height: 92vh;
+  overflow: auto;
+}
+
+.lightbox-inner figure {
+  margin: 0;
+  width: 100%;
+}
+
+/* Plot charts default to a fixed 640px width and only shrink; force them to
+   fill the enlarged container so the lightbox is a genuine zoom. */
+.lightbox-inner svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.lightbox-hint {
+  position: fixed;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  pointer-events: none;
+}
+
 .loading {
   color: var(--muted);
   padding: 40px 0;

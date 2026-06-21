@@ -1,7 +1,7 @@
 import "./styles.css";
 import type { Horizon, IndexAttribution, MacroData, Market } from "./types";
 import { applyTimeTheme } from "./theme";
-import { card, el, table } from "./ui";
+import { card, el, openLightbox, table } from "./ui";
 import {
   bflyStats,
   butterflyPanel,
@@ -21,8 +21,21 @@ const MARKET_TITLE: Record<string, string> = {
   JP: "JGB",
 };
 
-function figure(nodes: (HTMLElement | SVGSVGElement)[]): HTMLElement {
-  return el("figure", {}, nodes);
+type Chart = HTMLElement | SVGSVGElement;
+
+/** A chart container that enlarges into a lightbox when tapped/clicked.
+ *  Pass `rebuild` for charts with interactivity (e.g. the curve's value tips)
+ *  so the enlarged copy is live rather than a static clone. */
+function figure(nodes: Chart[], rebuild?: () => Chart[]): HTMLElement {
+  const fig = el("figure", { class: "zoomable", title: "Tap to enlarge" }, nodes);
+  fig.addEventListener("click", () => {
+    const content = rebuild
+      ? el("figure", {}, rebuild())
+      : (fig.cloneNode(true) as HTMLElement);
+    content.classList.remove("zoomable");
+    openLightbox(content);
+  });
+  return fig;
 }
 
 function structureCard(
@@ -58,7 +71,7 @@ function marketSection(name: string, m: Market): HTMLElement {
     el("h2", { class: "section" }, [`${title} — curve, slopes & butterflies`]),
 
     el("h3", { class: "sub" }, ["Curve snapshot & weekly shift"]),
-    figure(curveSnapshot(m.curve)),
+    figure(curveSnapshot(m.curve), () => curveSnapshot(m.curve)),
 
     el("div", { class: "grid-2" }, [
       card("Outright tenors", table(m.tenor_table)),
@@ -164,7 +177,7 @@ function sectorTable(attr: IndexAttribution, horizon: Horizon): HTMLElement {
 
 function indexBlock(attr: IndexAttribution): HTMLElement {
   let horizon: Horizon = "wow";
-  const chartHost = el("figure", {});
+  const chartHost = figure([]);
   const tableHost = el("div", {});
 
   const reconLine = el("div", { class: "stat-row recon" }, []);
@@ -225,7 +238,7 @@ function indexBlock(attr: IndexAttribution): HTMLElement {
     attr.prices && attr.prices.length
       ? card(
           `Price transition (~${(attr.prices.length / 252).toFixed(1)}y)`,
-          el("figure", {}, [priceTransition(attr.prices)]),
+          figure([priceTransition(attr.prices)]),
         )
       : el("div", {});
 
@@ -316,7 +329,7 @@ function correlationBlock(
       ]),
       el("p", { class: "note" }, [note]),
       el("div", { class: "grid-2" }, [
-        card("Standardized paths", el("figure", {}, [correlationOverlay(h.series, h.a, h.b)])),
+        card("Standardized paths", figure([correlationOverlay(h.series, h.a, h.b)])),
         card("Top pairs by |ρ|", correlationTable(c.ranked)),
       ]),
     );
