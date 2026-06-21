@@ -35,6 +35,10 @@ macro_watch (Python)            web/ (TypeScript)
 - `src/charts.ts` — Observable Plot charts (curve snapshot, PCA, FX fair value,
   sector contribution, z-scores).
 - `src/ui.ts` — DOM + table helpers (sign-colored, per-column formatting).
+- `src/theme.ts` — **time-of-day theme**: surfaces wash between a dark palette
+  (midnight) and a light one (local noon, white background); text snaps to the
+  contrasting extreme so it stays readable through dawn/dusk. Re-applied every
+  5 min so a long-open tab tracks the day.
 - `src/main.ts` — fetches `data.json` and assembles the page.
 
 ## Sections

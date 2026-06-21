@@ -1,5 +1,6 @@
 import "./styles.css";
 import type { Horizon, IndexAttribution, MacroData, Market } from "./types";
+import { applyTimeTheme } from "./theme";
 import { card, el, table } from "./ui";
 import {
   bflyStats,
@@ -284,11 +285,29 @@ function render(data: MacroData): void {
   );
 }
 
+// Re-apply the time-of-day theme periodically. CSS-variable changes recolor the
+// page chrome instantly; charts bake colors into SVG at render time, so they are
+// re-rendered only when the daylight factor has shifted enough to matter.
+const THEME_INTERVAL_MS = 5 * 60 * 1000;
+let currentData: MacroData | null = null;
+let lastFactor = -1;
+
+function tickTheme(): void {
+  const t = applyTimeTheme(new Date());
+  if (currentData && Math.abs(t - lastFactor) > 0.02) {
+    render(currentData);
+    lastFactor = t;
+  }
+}
+
 async function boot(): Promise<void> {
+  lastFactor = applyTimeTheme(new Date()); // theme the loading screen too
   try {
     const res = await fetch("/data.json");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    render((await res.json()) as MacroData);
+    currentData = (await res.json()) as MacroData;
+    render(currentData);
+    window.setInterval(tickTheme, THEME_INTERVAL_MS);
   } catch (err) {
     const app = document.getElementById("app")!;
     app.replaceChildren(

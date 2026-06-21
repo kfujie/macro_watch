@@ -1,13 +1,22 @@
 :root {
+  /* Dark defaults; theme.ts overrides bg/panel/border/grid/ink/muted/accent by
+     time of day (white at noon, dark at midnight). */
   --bg: #0f1419;
   --panel: #1a212b;
   --border: #2a3543;
+  --grid: #2a3543;
   --ink: #e6edf3;
   --muted: #8b98a8;
   --pos: #e06c5a;
   --neg: #4a90d9;
   --accent: #d4a017;
   font-synthesis: none;
+}
+
+body {
+  transition:
+    background-color 0.6s ease,
+    color 0.6s ease;
 }
 
 * {

@@ -14,18 +14,24 @@ const BEIC = "#52b6a8";
 
 const POS = "#e06c5a";
 const NEG = "#4a90d9";
-const INK = "#e6edf3";
-const MUTED = "#8b98a8";
-const GRID = "#2a3543";
 const LINE_COLORS = ["#d4a017", "#4a90d9", "#8b98a8"];
 
-const baseStyle = {
-  background: "transparent",
-  color: INK,
-  fontSize: "11px",
-} as const;
+// Theme colors are read from CSS variables at render time, so charts re-rendered
+// after a time-of-day theme change pick up the new ink/grid/muted automatically.
+const cssVar = (name: string, fallback: string): string =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim() ||
+  fallback;
+const ink = () => cssVar("--ink", "#e6edf3");
+const muted = () => cssVar("--muted", "#8b98a8");
+const grid = () => cssVar("--grid", "#2a3543");
 
-const gridColor = { stroke: GRID, strokeOpacity: 0.5 } as const;
+const base = () => ({
+  background: "transparent",
+  color: ink(),
+  fontSize: "11px",
+});
+
+const gridStroke = () => ({ stroke: grid(), strokeOpacity: 0.5 });
 
 /** Curve snapshot: yields at Current / 1W / 1M over evenly-spaced tenor ticks. */
 export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
@@ -45,7 +51,7 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
   }));
 
   const lines = Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 260,
     marginLeft: 44,
     marginRight: 96,
@@ -54,9 +60,9 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
       tickFormat: (i: number) => tenorLabels[i] ?? "",
       label: null,
       grid: true,
-      ...gridColor,
+      ...gridStroke(),
     },
-    y: { label: "Yield (%)", grid: true, ...gridColor },
+    y: { label: "Yield (%)", grid: true, ...gridStroke() },
     color: { domain: points.map((p) => p.label), range: LINE_COLORS, legend: true },
     marks: [
       Plot.line(points, { x: "x", y: "yield", stroke: "label", strokeWidth: 1.8 }),
@@ -65,7 +71,7 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
   });
 
   const bars = Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 150,
     marginLeft: 44,
     marginRight: 96,
@@ -74,14 +80,14 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
       tickFormat: (i: number) => tenorLabels[i] ?? "",
       label: "Tenor",
     },
-    y: { label: "WoW Δ (bp)", grid: true, ...gridColor },
+    y: { label: "WoW Δ (bp)", grid: true, ...gridStroke() },
     marks: [
       Plot.barY(shift, {
         x: "x",
         y: "bp",
         fill: (d: { bp: number | null }) => ((d.bp ?? 0) >= 0 ? POS : NEG),
       }),
-      Plot.ruleY([0], { stroke: INK, strokeOpacity: 0.6 }),
+      Plot.ruleY([0], { stroke: ink(), strokeOpacity: 0.6 }),
     ],
   });
 
@@ -98,11 +104,11 @@ export function pcaCharts(pca: Pca): (HTMLElement | SVGSVGElement)[] {
     })),
   );
   const loadings = Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 240,
     marginLeft: 44,
     x: { label: "Tenor", domain: pca.loadings.map((r) => String(r.tenor)) },
-    y: { label: "Loading", grid: true, ...gridColor },
+    y: { label: "Loading", grid: true, ...gridStroke() },
     color: { domain: ["PC1", "PC2", "PC3"], range: LINE_COLORS, legend: true },
     marks: [
       Plot.line(loadingsLong, {
@@ -112,23 +118,23 @@ export function pcaCharts(pca: Pca): (HTMLElement | SVGSVGElement)[] {
         strokeWidth: 1.8,
       }),
       Plot.dot(loadingsLong, { x: "tenor", y: "value", fill: "pc", r: 3 }),
-      Plot.ruleY([0], { stroke: MUTED, strokeOpacity: 0.5 }),
+      Plot.ruleY([0], { stroke: muted(), strokeOpacity: 0.5 }),
     ],
   });
 
   const rich = Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 240,
     marginLeft: 44,
     x: { label: "Tenor", domain: pca.rich_cheap.map((r) => r.tenor) },
-    y: { label: "Residual (bp, + = cheap)", grid: true, ...gridColor },
+    y: { label: "Residual (bp, + = cheap)", grid: true, ...gridStroke() },
     marks: [
       Plot.barY(pca.rich_cheap, {
         x: "tenor",
         y: "bp",
         fill: (d: { bp: number | null }) => ((d.bp ?? 0) >= 0 ? POS : NEG),
       }),
-      Plot.ruleY([0], { stroke: INK, strokeOpacity: 0.6 }),
+      Plot.ruleY([0], { stroke: ink(), strokeOpacity: 0.6 }),
     ],
   });
 
@@ -148,15 +154,15 @@ export function usdjpyVsDifferential(
   const px = parsed(usdjpy);
   const fit = parsed(fitted);
   return Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 300,
     marginLeft: 50,
     marginRight: 20,
-    x: { label: null, grid: true, ...gridColor },
-    y: { label: "USD/JPY", grid: true, ...gridColor },
+    x: { label: null, grid: true, ...gridStroke() },
+    y: { label: "USD/JPY", grid: true, ...gridStroke() },
     color: {
       domain: ["USD/JPY", "Rate-implied fair value"],
-      range: [INK, "#d4a017"],
+      range: [ink(), "#d4a017"],
       legend: true,
     },
     marks: [
@@ -214,16 +220,16 @@ export function butterflyPanel(
     });
 
   return Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 150,
     marginLeft: 40,
     marginRight: 12,
-    x: { label: null, grid: true, ...gridColor },
-    y: { label: "bp", grid: true, ...gridColor },
+    x: { label: null, grid: true, ...gridStroke() },
+    y: { label: "bp", grid: true, ...gridStroke() },
     marks: [
       band(2, 0.1),
       band(1, 0.18),
-      Plot.ruleY([mu], { stroke: INK, strokeDasharray: "3 3", strokeOpacity: 0.6 }),
+      Plot.ruleY([mu], { stroke: ink(), strokeDasharray: "3 3", strokeOpacity: 0.6 }),
       Plot.line(line, { x: "date", y: "value", stroke: PURPLE, strokeWidth: 1.4 }),
     ],
   });
@@ -238,12 +244,12 @@ export function priceTransition(
     .filter((p) => p.value !== null)
     .map((p) => ({ date: new Date(p.date), value: p.value as number }));
   return Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 200,
     marginLeft: 56,
     marginRight: 16,
-    x: { label: null, grid: true, ...gridColor },
-    y: { label: "Index level", grid: true, ...gridColor },
+    x: { label: null, grid: true, ...gridStroke() },
+    y: { label: "Index level", grid: true, ...gridStroke() },
     marks: [
       Plot.areaY(line, { x: "date", y: "value", fill: color, fillOpacity: 0.08 }),
       Plot.line(line, { x: "date", y: "value", stroke: color, strokeWidth: 1.5 }),
@@ -263,11 +269,11 @@ export function sectorContribution(
   rows.sort((a, b) => b.contrib - a.contrib);
 
   return Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 26 * rows.length + 44,
     marginLeft: 188,
     marginRight: 44,
-    x: { label: "Contribution to index move (pp)", grid: true, ...gridColor },
+    x: { label: "Contribution to index move (pp)", grid: true, ...gridStroke() },
     y: { label: null, domain: rows.map((r) => r.sector) },
     marks: [
       Plot.barX(rows, {
@@ -283,7 +289,7 @@ export function sectorContribution(
           text: (d: { contrib: number }) => "+" + d.contrib.toFixed(2),
           textAnchor: "start",
           dx: 4,
-          fill: INK,
+          fill: ink(),
           fontSize: 10,
         },
       ),
@@ -295,11 +301,11 @@ export function sectorContribution(
           text: (d: { contrib: number }) => d.contrib.toFixed(2),
           textAnchor: "end",
           dx: -4,
-          fill: INK,
+          fill: ink(),
           fontSize: 10,
         },
       ),
-      Plot.ruleX([0], { stroke: INK, strokeOpacity: 0.6 }),
+      Plot.ruleX([0], { stroke: ink(), strokeOpacity: 0.6 }),
     ],
   });
 }
@@ -327,12 +333,12 @@ export function oilVsBei(d: OilVsBei): HTMLElement | SVGSVGElement {
   const rightTicks = Array.from({ length: 5 }, (_, i) => w0 + (i / 4) * (w1 - w0));
 
   return Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 300,
     marginLeft: 52,
     marginRight: 56,
-    x: { label: null, grid: true, ...gridColor },
-    y: { domain: [w0, w1], label: "WTI ($/bbl)", grid: true, ...gridColor },
+    x: { label: null, grid: true, ...gridStroke() },
+    y: { domain: [w0, w1], label: "WTI ($/bbl)", grid: true, ...gridStroke() },
     color: {
       domain: ["WTI crude ($/bbl)", "10Y breakeven (%)"],
       range: [OIL, BEIC],
@@ -367,11 +373,11 @@ export function zscoreBars(
 ): HTMLElement | SVGSVGElement {
   const rows = data.filter((d) => d.z !== null);
   return Plot.plot({
-    style: baseStyle,
+    style: base(),
     height: 26 * rows.length + 40,
     marginLeft: 78,
     marginRight: 30,
-    x: { label: "1W z-score", domain: [-3, 3], grid: true, ...gridColor },
+    x: { label: "1W z-score", domain: [-3, 3], grid: true, ...gridStroke() },
     y: { label: null, domain: rows.map((r) => r.asset) },
     marks: [
       Plot.barX(rows, {
@@ -379,7 +385,7 @@ export function zscoreBars(
         x: "z",
         fill: (d: { z: number | null }) => ((d.z ?? 0) >= 0 ? POS : NEG),
       }),
-      Plot.ruleX([0], { stroke: INK, strokeOpacity: 0.6 }),
+      Plot.ruleX([0], { stroke: ink(), strokeOpacity: 0.6 }),
     ],
   });
 }
