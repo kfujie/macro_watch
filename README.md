@@ -19,8 +19,8 @@ macro_watch/
 
 | Block       | Series                                                      | Source |
 |-------------|-------------------------------------------------------------|--------|
-| JP rates    | JGB 2Y / 5Y / 10Y                                           | MoF Japan (Shift-JIS CSV, Japanese-era dates) |
-| US rates    | DGS2, DGS10, T10YIE (10Y breakeven)                         | FRED (keyless `fredgraph.csv`) |
+| JP rates    | JGB 2Y / 5Y / 10Y / 20Y / 30Y / 40Y                         | MoF Japan (Shift-JIS CSV, Japanese-era dates) |
+| US rates    | UST 2Y / 3Y / 5Y / 7Y / 10Y / 20Y / 30Y, T10YIE (10Y breakeven) | FRED (keyless `fredgraph.csv`) |
 | Commodities | WTI (`DCOILWTICO`), Gold                                    | FRED / Yahoo `GC=F` |
 | Equities    | `^GSPC`, `^IXIC`, `^N225`, `^TOPX`                          | Yahoo Finance (adjusted close) |
 
@@ -34,18 +34,31 @@ macro_watch/
 
 ## Analytics
 
-- **Yield curves** — US / JP 10Y-2Y slopes (bps).
+**Cross-asset**
 - **US real yield** — `US10Y_nominal − US10Y_BEI`.
 - **Momentum z-scores** — 1-week (5d) and 4-week (20d) moves normalized by rolling 90-day daily
   volatility (`σ_daily · √horizon`); log returns for prices, absolute diffs for yields.
 - **Rolling correlations** — 30d / 60d Pearson for Real Yield↔Gold, WTI↔BEI, S&P 500↔US10Y.
 
+**Rates deep-dive (US Treasury & JGB)** — `analytics.curve_metrics / rates_snapshot / tenor_snapshot / curve_pca`
+- **Slopes** — every standard pair in bps (US 2s5s/2s10s/5s10s/5s30s/10s30s/2s30s; JGB
+  2s10s/5s10s/10s20s/10s30s/20s30s/2s30s/5s30s).
+- **Butterflies** — `2·belly − wings` (bps), belly-cheap positive (US 2s5s10s/5s7s10s/5s10s30s/10s20s30s;
+  JGB 2s5s10s/5s10s20s/10s20s30s/20s30s40s).
+- **Snapshots** — outright tenor and curve tables with WoW/1M moves (bps), momentum z-score
+  (`Z_1W`), level richness z-score (`Z_level`), and trailing-year percentile.
+- **Curve PCA** — level/slope/curvature decomposition (sign-normalized PC1/PC2/PC3) with
+  3-factor **rich/cheap** residuals per tenor (+ cheap / − rich).
+
 ## Visualizations
 
 1. **Weekly cross-asset z-score heatmap** — magnitude of the week's moves across all blocks.
-2. **Yield-curve shifts** — US and JP curves: current vs 1 week / 1 month ago.
-3. **Macro decoupling tracker** — dual-axis real-rates/gold and WTI/breakevens.
-4. **Rolling correlations** — 30d/60d time series for the key macro pairs.
+2. **Macro decoupling tracker** — dual-axis real-rates/gold and WTI/breakevens.
+3. **Rolling correlations** — 30d/60d time series for the key macro pairs.
+4. **Curve snapshot & weekly shift** — full UST / JGB curve (current vs 1W / 1M) + per-tenor WoW bars.
+5. **Curve momentum/richness heatmap** — slope & fly `Z_1W` and `Z_level` for both markets.
+6. **Butterflies** — fly time series with ±1σ/±2σ bands and current z.
+7. **Curve PCA** — loadings, factor history, and rich/cheap residual bars.
 
 ## Setup (uv)
 

@@ -36,6 +36,47 @@ CORRELATION_PAIRS: Final[Mapping[str, tuple[str, str]]] = {
     "SPX_vs_US10Y": ("SPX", "US10Y"),
 }
 
+# --------------------------------------------------------------------------- #
+# Rates curve definitions (tenor in years -> canonical column)
+# --------------------------------------------------------------------------- #
+US_CURVE: Final[dict[int, str]] = {
+    2: "US2Y",
+    3: "US3Y",
+    5: "US5Y",
+    7: "US7Y",
+    10: "US10Y",
+    20: "US20Y",
+    30: "US30Y",
+}
+JP_CURVE: Final[dict[int, str]] = {
+    2: "JP2Y",
+    5: "JP5Y",
+    10: "JP10Y",
+    20: "JP20Y",
+    30: "JP30Y",
+    40: "JP40Y",
+}
+CURVES: Final[Mapping[str, dict[int, str]]] = {"US": US_CURVE, "JP": JP_CURVE}
+
+# Slope (short, long) and butterfly (short, belly, long) structures, in years.
+US_SLOPES: Final[tuple[tuple[int, int], ...]] = (
+    (2, 5), (2, 10), (5, 10), (5, 30), (10, 30), (2, 30),
+)
+US_FLIES: Final[tuple[tuple[int, int, int], ...]] = (
+    (2, 5, 10), (5, 7, 10), (5, 10, 30), (10, 20, 30),
+)
+JP_SLOPES: Final[tuple[tuple[int, int], ...]] = (
+    (2, 10), (5, 10), (10, 20), (10, 30), (20, 30), (2, 30), (5, 30),
+)
+JP_FLIES: Final[tuple[tuple[int, int, int], ...]] = (
+    (2, 5, 10), (5, 10, 20), (10, 20, 30), (20, 30, 40),
+)
+CURVE_STRUCTURES: Final[
+    Mapping[str, tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int, int], ...]]]
+] = {"US": (US_SLOPES, US_FLIES), "JP": (JP_SLOPES, JP_FLIES)}
+
+BP: Final[float] = 100.0  # percentage points -> basis points
+
 
 # --------------------------------------------------------------------------- #
 # Curves & real rates
@@ -140,6 +181,163 @@ def rolling_correlations(
                 inc[a].rolling(win, min_periods=max(5, win // 2)).corr(inc[b])
             )
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Rates: curves, slopes, butterflies, rich/cheap (US Treasury & JGB)
+# --------------------------------------------------------------------------- #
+def _slope_name(market: str, a: int, b: int) -> str:
+    return f"{market}_{a}s{b}s"
+
+
+def _fly_name(market: str, s: int, b: int, lo: int) -> str:
+    return f"{market}_{s}s{b}s{lo}s"
+
+
+def curve_levels(panel: pd.DataFrame, market: str) -> pd.DataFrame:
+    """Outright yield levels for a market's curve, columns ordered by tenor."""
+    cols = list(CURVES[market].values())
+    return panel[cols]
+
+
+def curve_metrics(panel: pd.DataFrame, market: str) -> pd.DataFrame:
+    """All curve slopes and butterflies for ``market`` as time series (bps).
+
+    Slope ``AsBs`` = (yield_B - yield_A) * 100.
+    Butterfly ``AsBsCs`` = (2*belly - short - long) * 100; positive = belly cheap.
+    """
+    curve = CURVES[market]
+    slopes, flies = CURVE_STRUCTURES[market]
+    out = pd.DataFrame(index=panel.index)
+    for a, b in slopes:
+        out[_slope_name(market, a, b)] = (panel[curve[b]] - panel[curve[a]]) * BP
+    for s, b, lo in flies:
+        out[_fly_name(market, s, b, lo)] = (
+            2.0 * panel[curve[b]] - panel[curve[s]] - panel[curve[lo]]
+        ) * BP
+    return out
+
+
+def _change_zscore(metric: pd.DataFrame, horizon: int, window: int) -> pd.DataFrame:
+    """Z-score of an ``horizon``-session change vs rolling daily-change vol."""
+    vol = metric.diff().rolling(window, min_periods=max(5, window // 3)).std(ddof=0)
+    return metric.diff(horizon) / (vol * np.sqrt(horizon)).replace(0.0, np.nan)
+
+
+def rates_snapshot(
+    panel: pd.DataFrame,
+    market: str,
+    *,
+    window: int = VOL_WINDOW,
+    pct_lookback: int = 252,
+) -> pd.DataFrame:
+    """Current curve slopes & flies with WoW/1M moves, momentum & level z-scores.
+
+    * ``Z_1W``   : momentum z-score of this week's move (vol-normalized).
+    * ``Z_level``: richness of the current level vs its trailing distribution.
+    * ``Pctile`` : percentile of the current level over ``pct_lookback`` sessions.
+    """
+    m = curve_metrics(panel, market).dropna(how="all")
+    as_of = m.index.max()
+
+    z1 = _change_zscore(m, WEEK, window)
+    lvl_mean = m.rolling(pct_lookback, min_periods=20).mean()
+    lvl_sd = m.rolling(pct_lookback, min_periods=20).std(ddof=0)
+    z_level = (m - lvl_mean) / lvl_sd.replace(0.0, np.nan)
+    pctile = m.tail(pct_lookback).rank(pct=True)
+
+    table = pd.DataFrame(index=m.columns)
+    table["Level(bp)"] = m.loc[as_of]
+    table["WoW(bp)"] = m.diff(WEEK).loc[as_of]
+    table["1M(bp)"] = m.diff(MONTH).loc[as_of]
+    table["Z_1W"] = z1.loc[as_of]
+    table["Z_level"] = z_level.loc[as_of]
+    table["Pctile"] = pctile.loc[as_of] * 100.0
+    table["Kind"] = ["Fly" if c.count("s") == 3 else "Slope" for c in table.index]
+    return table.round(3)
+
+
+def tenor_snapshot(
+    panel: pd.DataFrame, market: str, *, window: int = VOL_WINDOW
+) -> pd.DataFrame:
+    """Outright tenor levels with WoW/1M changes (bps) and momentum z-scores."""
+    lv = curve_levels(panel, market).dropna(how="all")
+    as_of = lv.index.max()
+    chg = lv.diff() * BP
+    vol = chg.rolling(window, min_periods=max(5, window // 3)).std(ddof=0)
+    z1 = (lv.diff(WEEK) * BP) / (vol * np.sqrt(WEEK)).replace(0.0, np.nan)
+
+    table = pd.DataFrame(index=lv.columns)
+    table["Yield(%)"] = lv.loc[as_of]
+    table["WoW(bp)"] = (lv.diff(WEEK) * BP).loc[as_of]
+    table["1M(bp)"] = (lv.diff(MONTH) * BP).loc[as_of]
+    table["Z_1W"] = z1.loc[as_of]
+    return table.round(3)
+
+
+@dataclass
+class PCAResult:
+    """Level/slope/curvature decomposition of a yield curve."""
+
+    as_of: pd.Timestamp
+    market: str
+    scores: pd.DataFrame          # PC time series (PC1..PCn)
+    loadings: pd.DataFrame        # tenor x PC
+    explained: pd.Series          # explained-variance ratio per PC
+    rich_cheap: pd.Series         # latest 3-factor residual per tenor (bps, + = cheap)
+
+
+def _orient_loadings(load: np.ndarray) -> np.ndarray:
+    """Sign-normalize PCs so PC1=level, PC2=slope, PC3=curvature are comparable."""
+    out = load.copy()
+    n_tenors = out.shape[1]
+    # PC1: positive level shift.
+    if out[0].sum() < 0:
+        out[0] *= -1
+    # PC2: upward-sloping (long end > short end).
+    if out.shape[0] > 1 and out[1, -1] < out[1, 0]:
+        out[1] *= -1
+    # PC3: positive curvature (belly above the wing average).
+    if out.shape[0] > 2:
+        mid = n_tenors // 2
+        if out[2, mid] < 0.5 * (out[2, 0] + out[2, -1]):
+            out[2] *= -1
+    return out
+
+
+def curve_pca(
+    panel: pd.DataFrame, market: str, *, lookback: int = 252, n_components: int = 3
+) -> PCAResult:
+    """PCA of the yield-curve levels: factors, loadings, and rich/cheap residuals.
+
+    Residual = actual - reconstruction from the first ``n_components`` factors;
+    a positive residual means the tenor yields *more* than the model => cheap.
+    """
+    cols = list(CURVES[market].values())
+    X = panel[cols].dropna()
+    if lookback:
+        X = X.tail(lookback)
+    if len(X) < n_components + 1:
+        raise ValueError(f"Insufficient history for {market} curve PCA ({len(X)} rows).")
+
+    mean = X.mean()
+    Xc = X.to_numpy() - mean.to_numpy()
+    _, sv, vt = np.linalg.svd(Xc, full_matrices=False)
+    load = _orient_loadings(vt[:n_components])          # (n, tenors)
+    scores = Xc @ load.T                                # (T, n)
+    evr = (sv**2 / np.sum(sv**2))[:n_components]
+    fit = scores @ load + mean.to_numpy()
+    resid_bps = (X.to_numpy()[-1] - fit[-1]) * BP
+
+    names = [f"PC{i + 1}" for i in range(n_components)]
+    return PCAResult(
+        as_of=X.index.max(),
+        market=market,
+        scores=pd.DataFrame(scores, index=X.index, columns=names),
+        loadings=pd.DataFrame(load.T, index=cols, columns=names),
+        explained=pd.Series(evr, index=names, name="explained_var"),
+        rich_cheap=pd.Series(resid_bps, index=cols, name="rich_cheap_bp"),
+    )
 
 
 # --------------------------------------------------------------------------- #

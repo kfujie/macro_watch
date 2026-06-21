@@ -32,11 +32,15 @@ JGB_HISTORICAL_CSV_URL: Final[str] = (
     "https://www.mof.go.jp/jgbs/reference/interest_rate/data/jgbcm_all.csv"
 )
 
-# MoF column label (Japanese) -> canonical name.
+# MoF column label (Japanese) -> canonical name. Full curve incl. super-longs,
+# which matter for JGB relative-value (flies / 20s30s40s, ASW box, etc.).
 JGB_TENOR_MAP: Final[Mapping[str, str]] = {
     "2年": "JP2Y",
     "5年": "JP5Y",
     "10年": "JP10Y",
+    "20年": "JP20Y",
+    "30年": "JP30Y",
+    "40年": "JP40Y",
 }
 
 # FRED keyless CSV endpoint (no API key required).
@@ -47,7 +51,12 @@ FRED_CSV_URL: Final[str] = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 # and de-listed by FRED (HTTP 404), so gold is sourced from Yahoo (GC=F) below.
 FRED_SERIES_MAP: Final[Mapping[str, str]] = {
     "DGS2": "US2Y",
+    "DGS3": "US3Y",
+    "DGS5": "US5Y",
+    "DGS7": "US7Y",
     "DGS10": "US10Y",
+    "DGS20": "US20Y",
+    "DGS30": "US30Y",
     "T10YIE": "US10Y_BEI",
     "DCOILWTICO": "WTI",
 }
@@ -64,13 +73,25 @@ YAHOO_TICKER_MAP: Final[Mapping[str, str]] = {
 }
 
 # Deterministic schema: order matters for Parquet validation.
-RATE_COLUMNS: Final[tuple[str, ...]] = (
+US_TENOR_COLUMNS: Final[tuple[str, ...]] = (
     "US2Y",
+    "US3Y",
+    "US5Y",
+    "US7Y",
     "US10Y",
-    "US10Y_BEI",
+    "US20Y",
+    "US30Y",
+)
+JP_TENOR_COLUMNS: Final[tuple[str, ...]] = (
     "JP2Y",
     "JP5Y",
     "JP10Y",
+    "JP20Y",
+    "JP30Y",
+    "JP40Y",
+)
+RATE_COLUMNS: Final[tuple[str, ...]] = (
+    US_TENOR_COLUMNS + ("US10Y_BEI",) + JP_TENOR_COLUMNS
 )
 COMMODITY_COLUMNS: Final[tuple[str, ...]] = ("WTI", "GOLD")
 EQUITY_COLUMNS: Final[tuple[str, ...]] = ("SPX", "NDX", "N225", "TOPIX")
