@@ -229,6 +229,13 @@ button.toggle.on {
   margin-bottom: 26px;
 }
 
+h4.minor {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin: 16px 0 6px;
+  color: var(--ink);
+}
+
 p.note {
   color: var(--muted);
   font-size: 11.5px;

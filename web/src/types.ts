@@ -74,6 +74,7 @@ export interface IndexAttribution {
   level: number;
   index_wow: number;
   index_1m: number;
+  prices: SeriesPoint[];
   weights_as_of: string;
   note: string;
   sectors: SectorRow[];

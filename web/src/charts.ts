@@ -220,6 +220,28 @@ export function butterflyPanel(
   });
 }
 
+/** Index price transition: a simple level line over the available history. */
+export function priceTransition(
+  points: SeriesPoint[],
+  color = "#5aa9e6",
+): HTMLElement | SVGSVGElement {
+  const line = points
+    .filter((p) => p.value !== null)
+    .map((p) => ({ date: new Date(p.date), value: p.value as number }));
+  return Plot.plot({
+    style: baseStyle,
+    height: 200,
+    marginLeft: 56,
+    marginRight: 16,
+    x: { label: null, grid: true, ...gridColor },
+    y: { label: "Index level", grid: true, ...gridColor },
+    marks: [
+      Plot.areaY(line, { x: "date", y: "value", fill: color, fillOpacity: 0.08 }),
+      Plot.line(line, { x: "date", y: "value", stroke: color, strokeWidth: 1.5 }),
+    ],
+  });
+}
+
 /** Sector contribution (weight x return, pp) to an index move, sorted desc. */
 export function sectorContribution(
   attr: IndexAttribution,

@@ -34,6 +34,7 @@ logger = logging.getLogger("macro_watch.sectors")
 
 WEEK: Final[int] = 5
 MONTH: Final[int] = 20
+PRICE_TAIL: Final[int] = 504  # sessions of index-price history for the web chart
 
 # Static index sector weights as of ~2026-Q1 (approximate, normalized below).
 WEIGHTS_AS_OF: Final[str] = "2026-01-31 (approx., static)"
@@ -211,12 +212,17 @@ def _index_attribution(
     def _sum(key: str) -> float:
         return float(sum(s[key] for s in sectors if s[key] is not None))
 
+    history = index_px.tail(PRICE_TAIL)
     return {
         "index_label": spec.index_label,
         "as_of": as_of.date().isoformat(),
         "level": float(index_px.iloc[-1]),
         "index_wow": _pct_change(index_px, WEEK) * 100.0,
         "index_1m": _pct_change(index_px, MONTH) * 100.0,
+        "prices": [
+            {"date": d.date().isoformat(), "value": float(v)}
+            for d, v in history.items()
+        ],
         "weights_as_of": WEIGHTS_AS_OF,
         "note": spec.note,
         "sectors": sorted(

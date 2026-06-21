@@ -6,6 +6,7 @@ import {
   butterflyPanel,
   curveSnapshot,
   pcaCharts,
+  priceTransition,
   sectorContribution,
   usdjpyVsDifferential,
   zscoreBars,
@@ -203,9 +204,19 @@ function indexBlock(attr: IndexAttribution): HTMLElement {
   if (attr.note) noteParts.push(attr.note);
   if (attr.error) noteParts.push(attr.error);
 
+  const priceCard =
+    attr.prices && attr.prices.length
+      ? card(
+          `Price transition (~${(attr.prices.length / 252).toFixed(1)}y)`,
+          el("figure", {}, [priceTransition(attr.prices)]),
+        )
+      : el("div", {});
+
   const host = el("div", { class: "index-block" }, [
     el("h3", { class: "sub" }, [attr.index_label]),
     statRow,
+    priceCard,
+    el("h4", { class: "minor" }, ["Sector contribution"]),
     toggles,
     reconLine,
     el("div", { class: "grid-2" }, [
