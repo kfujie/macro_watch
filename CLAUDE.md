@@ -8,6 +8,14 @@ cross-asset (equity/commodity) is supporting context.
 it — the front-end does **no** computation. Keep the two in sync: a new analytic = a field in
 `web_export.py` + a type in `web/src/types.ts` + a chart/table in `web/src/`.
 
+**Every change must reach the web too — code is not done until the live dashboard reflects it.**
+A change isn't finished at the Python/commit boundary: it must also surface in `web/` (export field
+→ type → chart/table) and, when pushed, land on the live site at https://kfujie.github.io/macro_watch/.
+Pushing to `main` triggers the **Deploy dashboard to GitHub Pages** workflow (`.github/workflows/deploy.yml`);
+after a push, confirm the deploy succeeded (`gh run list`) **and** that the live bundle actually
+serves the change (fetch the deployed `assets/index-*.js` and grep for the new code) — a green check
+alone is not proof. Always run `cd web && npm run build` before pushing so a `tsc` error never ships.
+
 ## Environment & commands
 - **uv-managed**, Python 3.13. Run everything via `uv run` (e.g. `uv run python -c ...`).
 - Smoke test: `uv run python -c "from macro_watch.data_loader import MacroDataLoader; MacroDataLoader().load()"`
