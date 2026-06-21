@@ -159,6 +159,20 @@ def _fx(panel: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def _oil_vs_bei(panel: pd.DataFrame) -> dict[str, Any]:
+    """WTI crude vs 10Y breakeven inflation (structurally positively correlated)."""
+    corr = analytics.rolling_correlations(panel)
+    corr_series = corr["WTI_vs_BEI_60d"].dropna() if "WTI_vs_BEI_60d" in corr else None
+    wti, bei = panel["WTI"].dropna(), panel["US10Y_BEI"].dropna()
+    return {
+        "wti": _series(panel["WTI"]),
+        "bei": _series(panel["US10Y_BEI"]),
+        "wti_level": _clean(wti.iloc[-1]) if len(wti) else None,
+        "bei_level": _clean(bei.iloc[-1]) if len(bei) else None,
+        "corr_60d": _clean(corr_series.iloc[-1]) if corr_series is not None and len(corr_series) else None,
+    }
+
+
 def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, Any]:
     """Assemble the full front-end payload from the canonical panel."""
     as_of = panel.dropna(how="all").index.max()
@@ -171,7 +185,8 @@ def build_payload(panel: pd.DataFrame, *, refresh: bool = False) -> dict[str, An
         "cross_asset": {
             "zscores": _clean(
                 [{"asset": a, "z": v} for a, v in zmatrix.dropna().items()]
-            )
+            ),
+            "oil_vs_bei": _oil_vs_bei(panel),
         },
     }
 

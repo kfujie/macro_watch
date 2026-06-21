@@ -82,12 +82,23 @@ export interface IndexAttribution {
   error?: string;
 }
 
+export interface OilVsBei {
+  wti: SeriesPoint[];
+  bei: SeriesPoint[];
+  wti_level: number | null;
+  bei_level: number | null;
+  corr_60d: number | null;
+}
+
 export interface MacroData {
   as_of: string;
   markets: Record<string, Market>;
   fx: Fx;
   equities: Record<string, IndexAttribution>;
-  cross_asset: { zscores: { asset: string; z: number | null }[] };
+  cross_asset: {
+    zscores: { asset: string; z: number | null }[];
+    oil_vs_bei: OilVsBei;
+  };
 }
 
 export type Horizon = "wow" | "1m";

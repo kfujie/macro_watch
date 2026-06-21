@@ -1,7 +1,16 @@
 import * as Plot from "@observablehq/plot";
-import type { Curve, Horizon, IndexAttribution, Pca, SeriesPoint } from "./types";
+import type {
+  Curve,
+  Horizon,
+  IndexAttribution,
+  OilVsBei,
+  Pca,
+  SeriesPoint,
+} from "./types";
 
 const PURPLE = "#a78bfa";
+const OIL = "#e0903a";
+const BEIC = "#52b6a8";
 
 const POS = "#e06c5a";
 const NEG = "#4a90d9";
@@ -291,6 +300,63 @@ export function sectorContribution(
         },
       ),
       Plot.ruleX([0], { stroke: INK, strokeOpacity: 0.6 }),
+    ],
+  });
+}
+
+/** WTI crude (left axis) vs 10Y breakeven (right axis), dual-scale overlay. */
+export function oilVsBei(d: OilVsBei): HTMLElement | SVGSVGElement {
+  const wti = parsed(d.wti);
+  const bei = parsed(d.bei);
+  const wv = wti.map((p) => p.value);
+  const bv = bei.map((p) => p.value);
+  const wMin = Math.min(...wv);
+  const wMax = Math.max(...wv);
+  const bMin = Math.min(...bv);
+  const bMax = Math.max(...bv);
+  const padW = (wMax - wMin) * 0.05 || 1;
+  const padB = (bMax - bMin) * 0.05 || 0.1;
+  const w0 = wMin - padW;
+  const w1 = wMax + padW;
+  const b0 = bMin - padB;
+  const b1 = bMax + padB;
+  // Map breakeven (%) onto the WTI ($) axis so both share one y scale.
+  const scale = (b: number) => w0 + ((b - b0) / (b1 - b0)) * (w1 - w0);
+  const inv = (y: number) => b0 + ((y - w0) / (w1 - w0)) * (b1 - b0);
+  const beiScaled = bei.map((p) => ({ date: p.date, value: scale(p.value) }));
+  const rightTicks = Array.from({ length: 5 }, (_, i) => w0 + (i / 4) * (w1 - w0));
+
+  return Plot.plot({
+    style: baseStyle,
+    height: 300,
+    marginLeft: 52,
+    marginRight: 56,
+    x: { label: null, grid: true, ...gridColor },
+    y: { domain: [w0, w1], label: "WTI ($/bbl)", grid: true, ...gridColor },
+    color: {
+      domain: ["WTI crude ($/bbl)", "10Y breakeven (%)"],
+      range: [OIL, BEIC],
+      legend: true,
+    },
+    marks: [
+      Plot.line(wti, {
+        x: "date",
+        y: "value",
+        stroke: () => "WTI crude ($/bbl)",
+        strokeWidth: 1.5,
+      }),
+      Plot.line(beiScaled, {
+        x: "date",
+        y: "value",
+        stroke: () => "10Y breakeven (%)",
+        strokeWidth: 1.5,
+      }),
+      Plot.axisY(rightTicks, {
+        anchor: "right",
+        label: "10Y breakeven (%)",
+        tickFormat: (y: number) => inv(y).toFixed(2),
+        color: BEIC,
+      }),
     ],
   });
 }

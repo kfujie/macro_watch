@@ -5,6 +5,7 @@ import {
   bflyStats,
   butterflyPanel,
   curveSnapshot,
+  oilVsBei,
   pcaCharts,
   priceTransition,
   sectorContribution,
@@ -241,8 +242,29 @@ function equitiesSection(data: MacroData): HTMLElement {
 }
 
 function crossAssetSection(data: MacroData): HTMLElement {
+  const ob = data.cross_asset.oil_vs_bei;
+  const fmt = (v: number | null, d: number, suffix = "") =>
+    v === null ? "–" : v.toFixed(d) + suffix;
   return el("section", {}, [
     el("h2", { class: "section" }, ["Cross-asset backdrop"]),
+
+    el("h3", { class: "sub" }, ["Oil vs breakeven inflation"]),
+    el("div", { class: "stat-row" }, [
+      el("span", {}, ["WTI ", el("b", {}, [fmt(ob.wti_level, 2, " $/bbl")])]),
+      el("span", {}, ["10Y breakeven ", el("b", {}, [fmt(ob.bei_level, 2, "%")])]),
+      el("span", {}, [
+        "60d corr ",
+        el("b", { class: (ob.corr_60d ?? 0) >= 0 ? "pos" : "neg" }, [
+          fmt(ob.corr_60d, 2),
+        ]),
+      ]),
+    ]),
+    el("p", { class: "note" }, [
+      "WTI crude and 10Y breakeven inflation are structurally positively correlated " +
+        "(oil feeds inflation expectations); a breakdown flags a demand- vs supply-driven regime.",
+    ]),
+    figure([oilVsBei(ob)]),
+
     el("h3", { class: "sub" }, ["1-week momentum (z-scores)"]),
     figure([zscoreBars(data.cross_asset.zscores)]),
   ]);
