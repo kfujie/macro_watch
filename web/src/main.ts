@@ -411,7 +411,9 @@ function tickTheme(): void {
 async function boot(): Promise<void> {
   lastFactor = applyTimeTheme(new Date()); // theme the loading screen too
   try {
-    const res = await fetch("/data.json");
+    // BASE_URL is "/" in dev and the configured base (e.g. "/macro_watch/") in a
+    // GitHub Pages build, so data.json resolves correctly under a subpath.
+    const res = await fetch(`${import.meta.env.BASE_URL}data.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     currentData = (await res.json()) as MacroData;
     render(currentData);
