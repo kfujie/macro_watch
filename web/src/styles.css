@@ -57,6 +57,14 @@ header.brief h1 {
 header.brief .as-of {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+header.brief .as-of .cadence {
+  display: block;
+  font-size: 11px;
+  opacity: 0.75;
+  letter-spacing: 0.3px;
 }
 
 h2.section {

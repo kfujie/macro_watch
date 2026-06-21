@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 22 * * 0" # Sun 22:00 UTC = Mon 07:00 JST (weekly brief)
+    - cron: "0 23 * * *" # daily 23:00 UTC (after US cash close; ~08:00 JST next day)
   workflow_dispatch:
 
 permissions:

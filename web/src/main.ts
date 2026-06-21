@@ -383,7 +383,10 @@ function render(data: MacroData): void {
   app.replaceChildren(
     el("header", { class: "brief" }, [
       el("h1", {}, ["Macro Watch — Weekly Rates Brief"]),
-      el("span", { class: "as-of" }, [`as of ${data.as_of}`]),
+      el("span", { class: "as-of" }, [
+        `as of ${data.as_of}`,
+        el("span", { class: "cadence" }, ["refreshed daily"]),
+      ]),
     ]),
     ...Object.entries(data.markets).map(([name, m]) => marketSection(name, m)),
     ratesCorrelationSection(data),
