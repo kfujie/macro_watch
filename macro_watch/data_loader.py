@@ -12,7 +12,7 @@ from __future__ import annotations
 import io
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Mapping
 
@@ -289,14 +289,19 @@ def load_fred(
 def load_yahoo(
     start: date, end: date, tickers: Mapping[str, str] = YAHOO_TICKER_MAP
 ) -> pd.DataFrame:
-    """Fetch adjusted-close equity-index series via yfinance."""
+    """Fetch adjusted-close equity-index series via yfinance.
+
+    ``end`` is treated as inclusive (consistent with the FRED loader); yfinance's
+    own ``end`` is exclusive, so we fetch through ``end + 1d`` — otherwise today's
+    just-closed bar (e.g. the Tokyo Nikkei/JPY print) is silently dropped.
+    """
     import yfinance as yf  # lazy import
 
     try:
         raw = yf.download(
             list(tickers),
             start=start,
-            end=end,
+            end=end + timedelta(days=1),
             auto_adjust=False,
             progress=False,
             group_by="column",

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final, Mapping
 
@@ -137,7 +137,8 @@ class SectorPrices:
         raw = yf.download(
             tickers,
             start=self.start,
-            end=self.end or datetime.now().date(),
+            # yfinance end is exclusive; +1d so today's just-closed bar is kept.
+            end=(self.end or datetime.now().date()) + timedelta(days=1),
             auto_adjust=False,
             progress=False,
             group_by="column",
