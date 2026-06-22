@@ -15,7 +15,7 @@ import argparse
 import json
 import math
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import numpy as np
 import pandas as pd
@@ -95,8 +95,19 @@ def _curve_snapshot(panel: pd.DataFrame, market: str) -> dict[str, Any]:
     return {"tenors": tenors, "snapshots": snapshots, "wow_shift_bp": _clean(wow)}
 
 
-def _pca(panel: pd.DataFrame, market: str) -> dict[str, Any]:
-    pca = analytics.curve_pca(panel, market)
+# PCA lookback windows (label, sessions). Recomputed per horizon so the front
+# end can toggle between recent-regime and structural decompositions.
+PCA_HORIZONS: Final[tuple[tuple[str, int], ...]] = (
+    ("1M", 20),
+    ("3M", 63),
+    ("6M", 126),
+    ("1Y", 252),
+)
+PCA_DEFAULT_HORIZON: Final[str] = "1Y"
+
+
+def _pca_horizon(panel: pd.DataFrame, market: str, lookback: int) -> dict[str, Any]:
+    pca = analytics.curve_pca(panel, market, lookback=lookback)
     loadings = pca.loadings.copy()
     loadings.index = [c.replace(market, "") for c in loadings.index]
     rich = pca.rich_cheap.copy()
@@ -107,6 +118,22 @@ def _pca(panel: pd.DataFrame, market: str) -> dict[str, Any]:
         "explained": _clean(pca.explained.to_dict()),
         "rich_cheap": _clean([{"tenor": t, "bp": v} for t, v in rich.items()]),
     }
+
+
+def _pca(panel: pd.DataFrame, market: str) -> dict[str, Any]:
+    horizons: list[dict[str, Any]] = []
+    for label, sessions in PCA_HORIZONS:
+        try:  # a short window may lack the rows for a 3-factor fit -> skip it
+            horizons.append({"label": label, **_pca_horizon(panel, market, sessions)})
+        except ValueError:
+            continue
+    labels = {h["label"] for h in horizons}
+    default = (
+        PCA_DEFAULT_HORIZON
+        if PCA_DEFAULT_HORIZON in labels
+        else (horizons[-1]["label"] if horizons else PCA_DEFAULT_HORIZON)
+    )
+    return {"default": default, "horizons": horizons}
 
 
 def _curve_structures(panel: pd.DataFrame, market: str, n_s: int) -> dict[str, Any]:

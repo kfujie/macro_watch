@@ -5,7 +5,7 @@ import type {
   Horizon,
   IndexAttribution,
   OilVsBei,
-  Pca,
+  PcaHorizon,
   SeriesPoint,
 } from "./types";
 
@@ -108,8 +108,9 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
   return [lines, bars];
 }
 
-/** PCA loadings (level/slope/curvature) and the rich/cheap residual bars. */
-export function pcaCharts(pca: Pca): (HTMLElement | SVGSVGElement)[] {
+/** PCA loadings (level/slope/curvature) and the rich/cheap residual bars
+ *  for a single lookback horizon. */
+export function pcaCharts(pca: PcaHorizon): (HTMLElement | SVGSVGElement)[] {
   const loadingsLong = pca.loadings.flatMap((row) =>
     ["PC1", "PC2", "PC3"].map((pc) => ({
       tenor: String(row.tenor),

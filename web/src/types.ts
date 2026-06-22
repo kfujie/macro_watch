@@ -14,11 +14,17 @@ export interface Curve {
 
 export type Row = Record<string, string | number | null>;
 
-export interface Pca {
+export interface PcaHorizon {
+  label: string; // "1M" | "3M" | "6M" | "1Y"
   as_of: string;
   loadings: Row[]; // { tenor, PC1, PC2, PC3 }
   explained: Record<string, number>;
   rich_cheap: { tenor: string; bp: number | null }[];
+}
+
+export interface Pca {
+  default: string; // label of the horizon shown first
+  horizons: PcaHorizon[]; // recomputed per lookback window
 }
 
 export interface SeriesPoint {

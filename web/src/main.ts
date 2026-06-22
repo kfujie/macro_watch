@@ -1,5 +1,12 @@
 import "./styles.css";
-import type { Horizon, IndexAttribution, MacroData, Market, SeriesPoint } from "./types";
+import type {
+  Horizon,
+  IndexAttribution,
+  MacroData,
+  Market,
+  Pca,
+  SeriesPoint,
+} from "./types";
 import { applyTimeTheme } from "./theme";
 import { card, el, openLightbox, table } from "./ui";
 import {
@@ -117,10 +124,70 @@ function structureGroup(
   return el("div", {}, [toggles, grid]);
 }
 
+/** Curve-PCA panel with a lookback toggle; loadings, explained variance and the
+ *  rich/cheap residual are recomputed per horizon in Python, so flipping the
+ *  button just swaps which horizon's charts are drawn. */
+function pcaSection(pca: Pca): HTMLElement {
+  const fallback = pca.horizons[pca.horizons.length - 1];
+  let current =
+    pca.horizons.find((h) => h.label === pca.default) ?? fallback;
+  const buttons: HTMLElement[] = [];
+  const body = el("div", {}, []);
+
+  const paint = (): void => {
+    if (!current) {
+      body.replaceChildren(el("p", { class: "note" }, ["No PCA for this market."]));
+      return;
+    }
+    const ev = current.explained;
+    const pctVar = (k: string) => ((ev[k] ?? 0) * 100).toFixed(1);
+    const charts = pcaCharts(current);
+    body.replaceChildren(
+      el("div", { class: "stat-row" }, [
+        el("span", {}, ["Explained variance: "]),
+        el("span", {}, [
+          "PC1 ",
+          el("b", {}, [`${pctVar("PC1")}%`]),
+          " · PC2 ",
+          el("b", {}, [`${pctVar("PC2")}%`]),
+          " · PC3 ",
+          el("b", {}, [`${pctVar("PC3")}%`]),
+        ]),
+      ]),
+      el("div", { class: "grid-2" }, [
+        card("Factor loadings", figure([charts[0]!])),
+        card("Rich / cheap residual", figure([charts[1]!])),
+      ]),
+    );
+  };
+
+  const toggles = el(
+    "div",
+    { class: "toggles" },
+    pca.horizons.map((h) => {
+      const b = el(
+        "button",
+        { class: "toggle" + (h.label === current?.label ? " on" : "") },
+        [h.label],
+      );
+      b.addEventListener("click", () => {
+        if (h.label === current?.label) return;
+        current = h;
+        buttons.forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        paint();
+      });
+      buttons.push(b);
+      return b;
+    }),
+  );
+
+  paint();
+  return el("div", {}, [toggles, body]);
+}
+
 function marketSection(name: string, m: Market): HTMLElement {
   const title = MARKET_TITLE[name] ?? name;
-  const ev = m.pca.explained;
-  const pctVar = (k: string) => ((ev[k] ?? 0) * 100).toFixed(1);
   const years = (m.butterflies.lookback / 252).toFixed(1);
 
   return el("section", {}, [
@@ -149,21 +216,11 @@ function marketSection(name: string, m: Market): HTMLElement {
     structureGroup(m.butterflies.series),
 
     el("h3", { class: "sub" }, ["Curve PCA — level / slope / curvature"]),
-    el("div", { class: "stat-row" }, [
-      el("span", {}, ["Explained variance: "]),
-      el("span", {}, [
-        "PC1 ",
-        el("b", {}, [`${pctVar("PC1")}%`]),
-        " · PC2 ",
-        el("b", {}, [`${pctVar("PC2")}%`]),
-        " · PC3 ",
-        el("b", {}, [`${pctVar("PC3")}%`]),
-      ]),
+    el("p", { class: "note" }, [
+      "Toggle the PCA lookback — loadings, explained variance and the rich/cheap " +
+        "residual are recomputed over each window (short = current regime, long = structural).",
     ]),
-    el("div", { class: "grid-2" }, [
-      card("Factor loadings", figure([pcaCharts(m.pca)[0]!])),
-      card("Rich / cheap residual", figure([pcaCharts(m.pca)[1]!])),
-    ]),
+    pcaSection(m.pca),
   ]);
 }
 
