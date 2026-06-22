@@ -515,7 +515,12 @@ async function boot(): Promise<void> {
   try {
     // BASE_URL is "/" in dev and the configured base (e.g. "/macro_watch/") in a
     // GitHub Pages build, so data.json resolves correctly under a subpath.
-    const res = await fetch(`${import.meta.env.BASE_URL}data.json`);
+    // data.json keeps a stable filename (not content-hashed like the JS bundle),
+    // so `no-cache` forces revalidation — otherwise a viewer's browser serves a
+    // stale copy after a deploy and the dashboard silently shows old data.
+    const res = await fetch(`${import.meta.env.BASE_URL}data.json`, {
+      cache: "no-cache",
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     currentData = (await res.json()) as MacroData;
     render(currentData);
