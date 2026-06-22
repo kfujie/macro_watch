@@ -483,7 +483,7 @@ function render(data: MacroData): void {
       el("h1", {}, ["Macro Watch — Weekly Rates Brief"]),
       el("span", { class: "as-of" }, [
         `as of ${data.as_of}`,
-        el("span", { class: "cadence" }, ["refreshed daily"]),
+        el("span", { class: "cadence" }, ["refreshed after the Tokyo & US closes"]),
       ]),
     ]),
     ...Object.entries(data.markets).map(([name, m]) => marketSection(name, m)),
