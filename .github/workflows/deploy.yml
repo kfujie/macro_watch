@@ -1,12 +1,16 @@
 name: Deploy dashboard to GitHub Pages
 
 # Builds a fresh data.json (Python) + the static site (Vite) and publishes it.
-# Runs on every push to main, weekly for fresh data, and on manual dispatch.
+# Runs on every push to main, twice daily for fresh data, and on manual dispatch.
 on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 23 * * *" # daily 23:00 UTC (after US cash close; ~08:00 JST next day)
+    # After the Japan session: Nikkei closes 15:30 JST and MoF publishes the day's
+    # JGB curve at 09:30 JST, so this run reflects the latest Japan data.
+    - cron: "30 7 * * 1-5" # 07:30 UTC = 16:30 JST, Mon-Fri (after Tokyo close)
+    # After the US cash close: refreshes US Treasury/equity closes for the day.
+    - cron: "0 23 * * *" # 23:00 UTC = 08:00 JST next day (after US cash close)
   workflow_dispatch:
 
 permissions:
