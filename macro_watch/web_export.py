@@ -66,12 +66,12 @@ def _series(series: pd.Series) -> list[dict[str, Any]]:
 # Section builders
 # --------------------------------------------------------------------------- #
 def _curve_snapshot(panel: pd.DataFrame, market: str) -> dict[str, Any]:
-    """Current/1W/1M curve levels + the WoW shift, for the curve chart."""
+    """Current/1W/1M curve levels + DoD/WoW/1M shift bars, for the curve chart."""
     curve = CURVES[market]
     tenors = list(curve)
     cols = list(curve.values())
     lvl = panel[cols].dropna(how="all")
-    as_of = lvl.index.max()
+    as_of = analytics.last_print_index(lvl)  # last real print, not a ffilled tail
     offsets = {
         "Current": as_of,
         "1W ago": lvl.index[lvl.index <= as_of - pd.Timedelta(days=7)].max(),
@@ -86,13 +86,25 @@ def _curve_snapshot(panel: pd.DataFrame, market: str) -> dict[str, Any]:
         for label, ts in offsets.items()
         if not pd.isna(ts)
     ]
-    cur, prev = offsets["Current"], offsets["1W ago"]
-    wow = (
-        ((lvl.loc[cur, cols] - lvl.loc[prev, cols]) * 100.0).tolist()
-        if not pd.isna(prev)
-        else [None] * len(cols)
-    )
-    return {"tenors": tenors, "snapshots": snapshots, "wow_shift_bp": _clean(wow)}
+    # Shift bars: yield change (bp) from the prior session / week / month.
+    prevs = {
+        "1D": lvl.index[lvl.index < as_of].max(),
+        "1W": offsets["1W ago"],
+        "1M": offsets["1M ago"],
+    }
+
+    def _shift(prev: pd.Timestamp) -> list[float | None]:
+        if pd.isna(prev):
+            return [None] * len(cols)
+        return ((lvl.loc[as_of, cols] - lvl.loc[prev, cols]) * 100.0).tolist()
+
+    shifts = {k: _clean(_shift(p)) for k, p in prevs.items()}
+    return {
+        "tenors": tenors,
+        "snapshots": snapshots,
+        "shifts": shifts,
+        "shift_default": "1W",
+    }
 
 
 # PCA lookback windows (label, sessions). Recomputed per horizon so the front

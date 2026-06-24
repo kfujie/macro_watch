@@ -38,7 +38,17 @@ const base = () => ({
 const gridStroke = () => ({ stroke: grid(), strokeOpacity: 0.5 });
 
 /** Curve snapshot: yields at Current / 1W / 1M over evenly-spaced tenor ticks. */
-export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
+/** Display labels for the curve-shift horizons emitted under `curve.shifts`. */
+export const SHIFT_LABEL: Record<string, string> = {
+  "1D": "DoD",
+  "1W": "WoW",
+  "1M": "MoM",
+};
+
+export function curveSnapshot(
+  curve: Curve,
+  shiftKey: string = curve.shift_default,
+): (HTMLElement | SVGSVGElement)[] {
   const tenorLabels = curve.tenors.map((t) => `${t}Y`);
   const points = curve.snapshots.flatMap((s) =>
     s.yields.map((y, i) => ({
@@ -48,7 +58,7 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
       label: `${s.label} (${s.date})`,
     })),
   );
-  const shift = curve.wow_shift_bp.map((v, i) => ({
+  const shift = (curve.shifts[shiftKey] ?? []).map((v, i) => ({
     x: i,
     tenor: tenorLabels[i]!,
     bp: v,
@@ -94,7 +104,7 @@ export function curveSnapshot(curve: Curve): (HTMLElement | SVGSVGElement)[] {
       tickFormat: (i: number) => tenorLabels[i] ?? "",
       label: "Tenor",
     },
-    y: { label: "WoW Δ (bp)", grid: true, ...gridStroke() },
+    y: { label: `${SHIFT_LABEL[shiftKey] ?? shiftKey} Δ (bp)`, grid: true, ...gridStroke() },
     marks: [
       Plot.barY(shift, {
         x: "x",

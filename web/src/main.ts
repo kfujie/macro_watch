@@ -1,5 +1,6 @@
 import "./styles.css";
 import type {
+  Curve,
   Horizon,
   IndexAttribution,
   MacroData,
@@ -19,6 +20,7 @@ import {
   priceTransition,
   ratesVolatility,
   sectorContribution,
+  SHIFT_LABEL,
   SLOPE_COLOR,
   usdjpyVsDifferential,
   zscoreBars,
@@ -186,6 +188,42 @@ function pcaSection(pca: Pca): HTMLElement {
   return el("div", {}, [toggles, body]);
 }
 
+/** Curve snapshot (level lines) whose shift bars toggle across DoD / WoW / MoM;
+ *  each horizon's bp shifts are precomputed in Python. */
+function curveSnapshotSection(curve: Curve): HTMLElement {
+  const keys = Object.keys(curve.shifts);
+  let key = keys.includes(curve.shift_default)
+    ? curve.shift_default
+    : (keys[keys.length - 1] ?? curve.shift_default);
+  const holder = el("div", {}, []);
+  const paint = (): void => {
+    holder.replaceChildren(
+      figure(curveSnapshot(curve, key), () => curveSnapshot(curve, key)),
+    );
+  };
+  const buttons: HTMLElement[] = [];
+  const toggles = el(
+    "div",
+    { class: "toggles" },
+    keys.map((k) => {
+      const b = el("button", { class: "toggle" + (k === key ? " on" : "") }, [
+        SHIFT_LABEL[k] ?? k,
+      ]);
+      b.addEventListener("click", () => {
+        if (k === key) return;
+        key = k;
+        buttons.forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        paint();
+      });
+      buttons.push(b);
+      return b;
+    }),
+  );
+  paint();
+  return el("div", {}, [toggles, holder]);
+}
+
 function marketSection(name: string, m: Market): HTMLElement {
   const title = MARKET_TITLE[name] ?? name;
   const years = (m.butterflies.lookback / 252).toFixed(1);
@@ -193,8 +231,8 @@ function marketSection(name: string, m: Market): HTMLElement {
   return el("section", {}, [
     el("h2", { class: "section" }, [`${title} — curve, slopes & butterflies`]),
 
-    el("h3", { class: "sub" }, ["Curve snapshot & weekly shift"]),
-    figure(curveSnapshot(m.curve), () => curveSnapshot(m.curve)),
+    el("h3", { class: "sub" }, ["Curve snapshot & shift (daily / weekly / monthly)"]),
+    curveSnapshotSection(m.curve),
 
     el("div", { class: "grid-2" }, [
       card("Outright tenors", table(m.tenor_table)),

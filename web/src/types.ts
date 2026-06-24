@@ -9,7 +9,8 @@ export interface CurveSnapshot {
 export interface Curve {
   tenors: number[];
   snapshots: CurveSnapshot[];
-  wow_shift_bp: (number | null)[];
+  shifts: Record<string, (number | null)[]>; // "1D" | "1W" | "1M" -> bp per tenor
+  shift_default: string;
 }
 
 export type Row = Record<string, string | number | null>;

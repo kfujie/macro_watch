@@ -432,6 +432,18 @@ def _change_zscore(metric: pd.DataFrame, horizon: int, window: int) -> pd.DataFr
     return metric.diff(horizon) / (vol * np.sqrt(horizon)).replace(0.0, np.nan)
 
 
+def last_print_index(frame: pd.DataFrame) -> pd.Timestamp:
+    """Last date the curve actually changed, ignoring forward-filled duplicates.
+
+    Rates lag the panel's as-of date (FRED/MoF publish a session late, so the
+    tail is ffilled); anchoring snapshots here keeps the day-over-day move a real
+    1-session change instead of a spurious zero against a filled row.
+    """
+    changed = frame.ne(frame.shift()).any(axis=1)
+    real = frame.index[changed]
+    return real.max() if len(real) else frame.index.max()
+
+
 def rates_snapshot(
     panel: pd.DataFrame,
     market: str,
@@ -439,14 +451,14 @@ def rates_snapshot(
     window: int = VOL_WINDOW,
     pct_lookback: int = 252,
 ) -> pd.DataFrame:
-    """Current curve slopes & flies with WoW/1M moves, momentum & level z-scores.
+    """Current curve slopes & flies with DoD/WoW/1M moves, momentum & level z-scores.
 
     * ``Z_1W``   : momentum z-score of this week's move (vol-normalized).
     * ``Z_level``: richness of the current level vs its trailing distribution.
     * ``Pctile`` : percentile of the current level over ``pct_lookback`` sessions.
     """
     m = curve_metrics(panel, market).dropna(how="all")
-    as_of = m.index.max()
+    as_of = last_print_index(m)
 
     z1 = _change_zscore(m, WEEK, window)
     lvl_mean = m.rolling(pct_lookback, min_periods=20).mean()
@@ -456,6 +468,7 @@ def rates_snapshot(
 
     table = pd.DataFrame(index=m.columns)
     table["Level(bp)"] = m.loc[as_of]
+    table["DoD(bp)"] = m.diff(1).loc[as_of]
     table["WoW(bp)"] = m.diff(WEEK).loc[as_of]
     table["1M(bp)"] = m.diff(MONTH).loc[as_of]
     table["Z_1W"] = z1.loc[as_of]
@@ -468,15 +481,16 @@ def rates_snapshot(
 def tenor_snapshot(
     panel: pd.DataFrame, market: str, *, window: int = VOL_WINDOW
 ) -> pd.DataFrame:
-    """Outright tenor levels with WoW/1M changes (bps) and momentum z-scores."""
+    """Outright tenor levels with DoD/WoW/1M changes (bps) and momentum z-scores."""
     lv = curve_levels(panel, market).dropna(how="all")
-    as_of = lv.index.max()
+    as_of = last_print_index(lv)
     chg = lv.diff() * BP
     vol = chg.rolling(window, min_periods=max(5, window // 3)).std(ddof=0)
     z1 = (lv.diff(WEEK) * BP) / (vol * np.sqrt(WEEK)).replace(0.0, np.nan)
 
     table = pd.DataFrame(index=lv.columns)
     table["Yield(%)"] = lv.loc[as_of]
+    table["DoD(bp)"] = (lv.diff(1) * BP).loc[as_of]
     table["WoW(bp)"] = (lv.diff(WEEK) * BP).loc[as_of]
     table["1M(bp)"] = (lv.diff(MONTH) * BP).loc[as_of]
     table["Z_1W"] = z1.loc[as_of]
